@@ -137,6 +137,5 @@ Use the environment's Python (`.venv/bin/python` or `.venv\Scripts\python.exe`).
 ## Official MKD repositories
 
 - Primary: [mkd-hossain/nvidia-dgx-spark-factory-reset](https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset)
-- Maintainer mirror: [hossain0707/nvidia-dgx-spark-factory-reset](https://github.com/hossain0707/nvidia-dgx-spark-factory-reset)
 
 Neither is an official NVIDIA/ASUS project. Names and marks belong to their respective owners.
