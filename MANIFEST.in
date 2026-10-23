@@ -1,0 +1,3 @@
+include LICENSE README.md SECURITY.md CONTRIBUTING.md CHANGELOG.md run.sh run.ps1
+recursive-include docs *.md
+recursive-include assets *.svg

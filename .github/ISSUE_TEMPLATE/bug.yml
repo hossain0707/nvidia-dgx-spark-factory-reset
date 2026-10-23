@@ -1,0 +1,31 @@
+name: Recovery problem
+description: Report a sanitized bug without private identifiers or recovery images
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not upload keys, passwords, images, logs containing personal paths, MAC/IP/serial identifiers, or private state. Do not reboot a writing installer just to collect a report."
+  - type: input
+    id: version
+    attributes:
+      label: Tool version / commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Host OS, Python and Ethernet adapter
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Target OEM/model and official image version (no serial/MAC)
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected result, actual result, phase and sanitized error
+    validations:
+      required: true

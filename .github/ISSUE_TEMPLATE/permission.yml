@@ -1,0 +1,26 @@
+name: MKD permission request
+description: Request written permission for commercial/organizational use or redistribution
+labels: [permission-request]
+body:
+  - type: markdown
+    attributes:
+      value: "Personal noncommercial use is free under LICENSE. This request does not itself grant permission. Do not share confidential business details or credentials in a public issue."
+  - type: input
+    id: organization
+    attributes:
+      label: Organization or requester (public information only)
+    validations:
+      required: true
+  - type: textarea
+    id: intended-use
+    attributes:
+      label: Proposed commercial/organizational use or redistribution scope
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgment
+    attributes:
+      label: Permission status
+      options:
+        - label: I understand that MKD must expressly grant written permission before the restricted use.
+          required: true

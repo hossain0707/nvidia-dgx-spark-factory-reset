@@ -1,0 +1,57 @@
+MKD Personal Use and Permission-Required License
+Version 1.0 — 2026-10-23
+
+Copyright (c) 2026 MKD and contributors. All rights reserved except as granted below.
+
+1. Personal-use grant
+MKD grants an individual a nonexclusive, worldwide, royalty-free license to
+download, inspect, run, and privately modify this project's original software
+solely for that individual's personal, noncommercial use. Personal backup
+copies are permitted. No payment or prior permission is needed for those uses.
+
+2. Uses requiring prior written permission from MKD
+Commercial or organizational use and redistribution require MKD's prior written
+permission. This includes internal business deployment, paid recovery/support
+services, resale, bundling, hosting for others, and distributing source, binaries,
+or modified versions outside the platform rights in section 3. MKD may specify
+separate terms for an approved use. Silence does not constitute permission.
+
+3. Public repository and contributions
+This license does not limit rights granted to GitHub or its users under GitHub's
+applicable Terms of Service to view and fork a public repository through GitHub's
+functionality. Those platform rights do not expand commercial-use or off-platform
+redistribution permissions granted here. Submitting a contribution to an official
+MKD repository grants MKD permission to use, modify, maintain and distribute that
+contribution with this project under this license and separate permissions MKD
+grants for the project. Contributors must have authority to grant those rights;
+contribution ownership is not transferred.
+
+4. Notices and third-party materials
+Keep this license and copyright notices with permitted copies. Vendor recovery
+images, bootloaders, firmware, dependencies and trademarks retain their own terms.
+This license grants no rights to those third-party materials. Vendor artifacts
+are not included in this repository.
+
+5. No endorsement or trademark grant
+This project is not affiliated with or endorsed by NVIDIA, ASUS, Microsoft,
+Apple, Canonical or GitHub. No trademark license is granted.
+
+6. Disclaimer and limitation of liability
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. RECOVERY CAN PERMANENTLY ERASE DATA. YOU ARE RESPONSIBLE FOR
+AUTHORIZATION, BACKUPS, HARDWARE COMPATIBILITY AND VALIDATION. TO THE MAXIMUM
+EXTENT PERMITTED BY LAW, MKD AND CONTRIBUTORS ARE NOT LIABLE FOR CLAIMS, DAMAGES
+OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE, WHETHER IN CONTRACT,
+TORT OR OTHERWISE. Non-waivable statutory rights are not excluded.
+
+7. Termination and permission requests
+The rights granted here terminate upon material breach. No other rights are
+granted. Request written permission using the "MKD permission request" template
+in an official repository:
+https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset
+https://github.com/hossain0707/nvidia-dgx-spark-factory-reset
+Only an express written permission grant from MKD authorizes a restricted use.
+
+This is a source-available personal-use license, not an OSI-approved open-source
+license. Personal use is free; commercial use and redistribution need permission.
