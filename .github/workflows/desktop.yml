@@ -50,6 +50,19 @@ jobs:
           if (-not (Test-Path -LiteralPath $compiler)) { choco install innosetup --yes --no-progress }
           & $compiler packaging/windows.iss
           if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+      - name: Test Windows install, launch and uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'MKD-Recovery-Installer-Test'
+          $installer = (Get-ChildItem -LiteralPath dist/installers -Filter '*Setup.exe').FullName
+          $task = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$destination`"") -Wait -PassThru -WindowStyle Hidden
+          if ($task.ExitCode -ne 0) { throw "Installation failed: $($task.ExitCode)" }
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $task = Start-Process -FilePath (Join-Path $destination 'MKD-Spark-Recovery.exe') -ArgumentList '--smoke-test' -Wait -PassThru -WindowStyle Hidden
+          if ($task.ExitCode -ne 0) { throw "Installed app failed: $($task.ExitCode)" }
+          $task = Start-Process -FilePath (Join-Path $destination 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru -WindowStyle Hidden
+          if ($task.ExitCode -ne 0) { throw "Uninstallation failed: $($task.ExitCode)" }
       - name: Smoke test and package macOS application
         if: runner.os == 'macOS'
         env:
@@ -60,6 +73,7 @@ jobs:
           cp -R "dist/MKD Spark Recovery.app" dmg-content/
           ln -s /Applications dmg-content/Applications
           hdiutil create -volname "MKD Spark Recovery" -srcfolder dmg-content -ov -format UDZO "dist/installers/MKD-Spark-Recovery-0.2.0-${{ matrix.label }}.dmg"
+          hdiutil verify "dist/installers/MKD-Spark-Recovery-0.2.0-${{ matrix.label }}.dmg"
       - name: Checksums
         shell: python
         run: |

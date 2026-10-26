@@ -734,6 +734,12 @@ def main(argv=None):
     window = Window()
     window.show()
     if args.smoke_test:
+        import pycdlib
+        import zstandard
+        assert isinstance(pycdlib.PyCdlib(), pycdlib.PyCdlib)
+        payload = zstandard.ZstdCompressor().compress(b"bundle dependency check")
+        assert zstandard.ZstdDecompressor().decompress(payload) == b"bundle dependency check"
+        assert Path(__file__).with_name("target.py").is_file(), "Bundled target helper missing"
         assert window.pages.count() == 5
         assert not window.start.isEnabled() and not window.authorize_button.isEnabled()
         assert not window.install_started.isEnabled() and window.root is None
