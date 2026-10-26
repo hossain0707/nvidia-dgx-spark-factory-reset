@@ -20,4 +20,7 @@ target-inventory.json
 .env*
 *.key
 *.pem
+pytest-of-*/
+tmp*/
+dmg-content/
 

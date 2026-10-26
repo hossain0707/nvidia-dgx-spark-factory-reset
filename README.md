@@ -17,9 +17,18 @@ Terminal tooling for serving a verified **ASUS Ascent GX10** recovery image over
 
 ## Start here
 
+### Desktop app (Windows and Mac)
+
+The **v0.2.0 desktop preview** adds guided setup, real download progress, explicit erase safeguards and local timing reports. Download the Windows installer or Apple Silicon/Intel Mac disk image from [Releases](https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset/releases), then follow the [desktop guide](docs/DESKTOP.md). These builds are unsigned previews; signing/notarization and full desktop hardware qualification remain outstanding. The terminal workflow remains available below.
+
+Timing separates preparation, the recovery session and the operator-observed installation interval. First boot must be confirmed at the target console; download completion never counts as reset success.
+
+![MKD Spark Recovery desktop preview](assets/desktop-preview.png)
+
 | I want to… | Guide |
 |---|---|
 | Prepare from Windows | [Windows terminal](docs/WINDOWS.md) |
+| Use the Windows / Mac desktop app | [Desktop and timing](docs/DESKTOP.md) |
 | Prepare from a Mac | [macOS terminal](docs/MACOS.md) |
 | Prepare from Linux | [Linux terminal](docs/LINUX.md) |
 | Run on the GX10 / control it over SSH | [Target and SSH](docs/TARGET-AND-SSH.md) |

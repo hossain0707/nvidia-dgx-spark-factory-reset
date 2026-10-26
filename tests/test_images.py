@@ -6,7 +6,7 @@ import zipfile
 import pytest
 
 from spark_recovery.config import RecoveryError
-from spark_recovery.images import extract_package, inspect_initrd
+from spark_recovery.images import download, extract_package, inspect_initrd
 from spark_recovery.profiles import ASUS
 
 
@@ -43,3 +43,20 @@ def test_bad_image_refused(tmp_path):
     initrd.write_bytes(b"bad initrd")
     with pytest.raises(RecoveryError):
         inspect_initrd(initrd)
+
+
+def test_download_progress_counts_verified_bytes(tmp_path, monkeypatch):
+    payload = b"approved test artifact" * 100
+    class Response(io.BytesIO):
+        headers = {"Content-Length": str(len(payload))}
+        def geturl(self):
+            return "https://vendor.example/artifact"
+    monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: Response(payload))
+    events = []
+    destination = download("https://vendor.example/artifact", tmp_path / "artifact",
+                           hashlib.sha256(payload).hexdigest(), progress=events.append)
+    assert destination.read_bytes() == payload
+    assert events[-1]["received"] == events[-1]["total"] == len(payload)
+    with pytest.raises(RecoveryError, match="SHA256"):
+        download("https://vendor.example/artifact", tmp_path / "rejected", "0" * 64, progress=events.append)
+    assert not (tmp_path / "rejected").exists()

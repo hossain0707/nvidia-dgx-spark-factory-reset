@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spark-recovery"
-version = "0.1.0"
+version = "0.2.0"
 description = "Diagnostic-first Ethernet recovery tooling for supported DGX Spark OEM images"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,9 +17,12 @@ Issues = "https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10", "build>=1.2,<2", "ruff>=0.14,<1"]
+desktop = ["PySide6-Essentials>=6.8,<7"]
+bundle = ["pyinstaller>=6.16,<7"]
 
 [project.scripts]
 spark-recovery = "spark_recovery.cli:main"
+spark-recovery-desktop = "spark_recovery.desktop:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

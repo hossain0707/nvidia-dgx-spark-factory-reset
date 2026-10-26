@@ -1,5 +1,7 @@
 # Security and data safety
 
+Desktop: the Qt GUI stays unelevated; native OS authorization launches only the fixed serve/restore helper. Local session owners are trusted. Status and timing files do not remotely certify a reset. Install from official releases and verify hashes. Read [desktop recovery/cleanup behavior](docs/DESKTOP.md). Current binaries are unsigned previews without publisher signing or Apple notarization.
+
 This tool can expose an installer that permanently erases an SSD. Use it only on equipment you are authorized to recover and only after backups. Host-side diagnostics and checksums do not guarantee every later installation step will succeed.
 
 ## Boundary

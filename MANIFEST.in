@@ -1,3 +1,5 @@
 include LICENSE README.md SECURITY.md CONTRIBUTING.md CHANGELOG.md run.sh run.ps1
+include THIRD_PARTY_NOTICES.md desktop_entry.py
 recursive-include docs *.md
-recursive-include assets *.svg
+recursive-include assets *.svg *.png
+recursive-include packaging *.spec *.iss *.py *.txt

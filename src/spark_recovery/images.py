@@ -16,7 +16,7 @@ from .menu import render
 from .profiles import ASUS
 
 
-def download(url: str, destination: Path, expected: str) -> Path:
+def download(url: str, destination: Path, expected: str, *, progress=None) -> Path:
     if not url.startswith("https://"):
         raise RecoveryError("Artifact downloads require HTTPS")
     if destination.exists() and digest(destination) == expected:
@@ -28,7 +28,13 @@ def download(url: str, destination: Path, expected: str) -> Path:
     with urllib.request.urlopen(url, timeout=60) as response, partial.open("wb") as output:  # noqa: S310
         if not response.geturl().startswith("https://"):
             raise RecoveryError("Refusing a redirect to an insecure artifact URL")
-        shutil.copyfileobj(response, output, 4 * 1024 * 1024)
+        total = int(response.headers.get("Content-Length") or 0)
+        received = 0
+        while chunk := response.read(4 * 1024 * 1024):
+            output.write(chunk)
+            received += len(chunk)
+            if progress:
+                progress({"stage": "Downloading " + destination.name, "received": received, "total": total})
     if digest(partial) != expected:
         raise RecoveryError(f"Artifact SHA256 mismatch; not activated. Inspect {partial}")
     partial.replace(destination)
@@ -143,8 +149,12 @@ def verify_bootloader(path: Path) -> None:
 
 
 def prepare(root: Path, session: Session, iso: Path | None = None, package: Path | None = None,
-            bootloader: Path | None = None) -> dict:
+            bootloader: Path | None = None, *, progress=None) -> dict:
     import pycdlib
+    def stage(message):
+        if progress:
+            progress({"stage": message})
+    stage("Checking available storage and official artifacts")
     root.mkdir(parents=True, exist_ok=True)
     if iso is None:
         assets = root / "assets"
@@ -152,11 +162,13 @@ def prepare(root: Path, session: Session, iso: Path | None = None, package: Path
         if package is None:
             if shutil.disk_usage(root).free < 24 * 1024**3:
                 raise RecoveryError("Allow at least 24 GiB free to download and unpack the ASUS package")
-            package = download(ASUS["url"], assets / "asus-package.zip", ASUS["package_sha256"])
+            package = download(ASUS["url"], assets / "asus-package.zip", ASUS["package_sha256"], progress=progress)
         iso = assets / "recovery.iso"
         if not iso.exists() or digest(iso) != ASUS["iso_sha256"]:
+            stage("Verifying package and extracting ASUS ISO")
             extract_package(package, iso)
     iso = iso.resolve()
+    stage("Verifying full ISO SHA-256; this reads the entire image")
     if iso.stat().st_size != ASUS["iso_bytes"] or digest(iso) != ASUS["iso_sha256"]:
         raise RecoveryError("ISO is not the pinned ASUS GX10 image; refusing to prepare it")
     tftp = root / "tftp"
@@ -171,15 +183,17 @@ def prepare(root: Path, session: Session, iso: Path | None = None, package: Path
         image.get_record(rr_path="/oemdata/debs")
     finally:
         image.close()
+    stage("Inspecting recovery kernel, drivers and diagnostic guards")
     guards = inspect_initrd(tftp / "casper" / "initrd")
     destination = tftp / "grubnetaa64.efi.signed"
     if bootloader:
         verify_bootloader(bootloader)
         shutil.copyfile(bootloader, destination)
     else:
-        download(ASUS["bootloader_url"], destination, ASUS["bootloader_sha256"])
+        download(ASUS["bootloader_url"], destination, ASUS["bootloader_sha256"], progress=progress)
         verify_bootloader(destination)
     (tftp / "grub" / "grub.cfg").write_text(render(session), encoding="utf-8")
+    stage("Writing verified manifest and diagnostic-only boot menu")
     manifest = {"session": session.fingerprint, "profile": session.profile,
                 "iso_path": str(iso), "iso_sha256": digest(iso), "guards": guards,
                 "boot_files": {str(path.relative_to(tftp)).replace("\\", "/"): digest(path)

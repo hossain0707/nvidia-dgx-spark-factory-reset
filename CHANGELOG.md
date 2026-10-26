@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 desktop preview — 2026-10-26
+
+- Optional Windows/macOS desktop frontend; existing terminal recovery engine retained.
+- Guided setup, real download progress, strict SSH/import inventory, diagnostic checks and exact SSD authorization.
+- Separate elevated helper with heartbeat and existing journaled network restoration.
+- Monotonic timing, interrupted-run detection and identifier-free reports; no transfer-to-success inference.
+- Windows x64 installer and Apple Silicon/Intel Mac DMG builds, frozen-app smoke tests and SHA-256 manifests.
+- Preview status until publisher signing, notarization and full hardware qualification are complete.
+
 ## 0.1.0 — community preview
 
 - Parameterized Windows/macOS/Linux host CLI and isolated Ethernet plan.
