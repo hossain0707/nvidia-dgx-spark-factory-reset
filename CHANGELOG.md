@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 Windows helper status hotfix — 2026-10-27
+
+- Grant the session owner's explicit Windows SID inheritable access before elevation, so output written by a different administrator remains readable by the normal app. Do not grant broad Users/Everyone access.
+- Report unreadable or malformed helper status as an actionable readiness failure instead of silently treating it as an absent helper.
+- Display helper startup, full image verification, host-network configuration and service binding stages separately. Readiness is still reported only after services start.
+- Use pointer-sized Windows ShellExecute return values and retain separate network, reboot and erase consent gates.
+- Handle the address disappearing when ICS stops, make missing firewall-rule cleanup idempotent, and return explicit PowerShell success/failure with readable error messages.
+
+Existing sessions containing administrator-owned files may need a scoped administrator permission repair and saved-network restoration. This hotfix does not by itself qualify Dell hardware or fix an unrelated network-service error hidden in an unreadable old log.
+
 ## 0.3.0 discovery and OEM preview — 2026-10-27
 
 - Detect wired adapters, scoped IPv4/IPv6 neighbors and SSH endpoints; bound isolated-link searches and avoid Wi-Fi/default-gateway guesses.

@@ -30,6 +30,17 @@ def test_additive_network_cleanup(tmp_path, session, monkeypatch, platform):
     assert all(session.interface in args for args in calls)
 
 
+def test_powershell_wrapper_has_explicit_exit_and_plain_errors(monkeypatch):
+    import base64
+    calls = []
+    monkeypatch.setattr(network, "command", lambda args: calls.append(args) or "ok")
+    assert network.powershell("Get-Service SharedAccess") == "ok"
+    source = base64.b64decode(calls[0][-1]).decode("utf-16-le")
+    assert "$ProgressPreference='SilentlyContinue'" in source
+    assert "; exit 0 } catch" in source
+    assert "[Console]::Error.WriteLine($_.Exception.Message); exit 1" in source
+
+
 def test_different_interface_refused(tmp_path, session, monkeypatch):
     monkeypatch.setattr(network, "require_admin", lambda: None)
     monkeypatch.setattr(network, "interface_index", lambda _: 12)

@@ -16,7 +16,7 @@ from .cli import ssh_command
 from .config import RecoveryError, Session, atomic_json
 from .connection import DeviceConnection, configured_user, key_status, trust_key
 from .discovery import choose_adapter, collect_adapters, discover, network_plan, refresh_link_local, target_mac
-from .desktop_service import launch, run_service
+from .desktop_service import launch, run_service, read_service_status
 from .images import prepare
 from .locking import ServiceLock
 from .network import command, powershell
@@ -839,8 +839,6 @@ def main(argv=None):
             self.guarded(start)
 
         def launch_helper(self, operation):
-            for name in ("desktop-stop", "desktop-service.json"):
-                (self.root / name).unlink(missing_ok=True)
             self.helper = launch(self.root, operation, stop_ics=self.ics.isChecked())
             self.pending = True
             self.launch_at = time.monotonic()
@@ -1025,9 +1023,12 @@ def main(argv=None):
                 except (OSError, ValueError, KeyError):
                     pass
             try:
-                status = json.loads((self.root / "desktop-service.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError):
+                status = read_service_status(self.root)
+            except RecoveryError as error:
                 status = None
+                self.services = False
+                self.pending = False
+                self.notice(str(error))
             if status:
                 phase = status.get("phase", "")
                 recent = time.time() - status.get("heartbeat", 0) < 12

@@ -7,7 +7,8 @@ import pytest
 
 from spark_recovery.config import RecoveryError
 from spark_recovery.desktop import inspect_ssh, inventory_disks
-from spark_recovery.desktop_service import ServiceStatus, app_command, launch
+from spark_recovery.desktop_service import (ServiceStatus, app_command, launch,
+                                           prepare_shared_state, read_service_status)
 from spark_recovery.timing import RecoveryTiming, duration
 
 
@@ -86,8 +87,37 @@ def test_helper_readiness_only_on_server_message(tmp_path):
     status = ServiceStatus(tmp_path, "serve")
     status.emit(logging.makeLogRecord({"msg": "HTTP downloaded"}))
     assert json.loads((tmp_path / "desktop-service.json").read_text())["phase"] == "starting"
+    status.emit(logging.makeLogRecord({"msg": "Recovery stage: Image verified; configuring host"}))
+    progress = json.loads((tmp_path / "desktop-service.json").read_text())
+    assert progress["phase"] == "starting" and progress["message"] == "Image verified; configuring host"
     status.emit(logging.makeLogRecord({"msg": "Serving ONLY target"}))
     assert json.loads((tmp_path / "desktop-service.json").read_text())["phase"] == "ready"
+
+
+def test_windows_helper_grants_only_session_owner_inheritable_access(monkeypatch, tmp_path):
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("spark_recovery.desktop_service.powershell", lambda source: "S-1-5-21-100-200-300-1001")
+    calls = []
+    monkeypatch.setattr("spark_recovery.desktop_service.command", calls.append)
+    prepare_shared_state(tmp_path)
+    assert calls == [["icacls.exe", str(tmp_path.resolve()), "/grant", "*S-1-5-21-100-200-300-1001:(OI)(CI)F"]]
+    monkeypatch.setattr("spark_recovery.desktop_service.powershell", lambda source: "Everyone")
+    with pytest.raises(RecoveryError, match="session owner"):
+        prepare_shared_state(tmp_path)
+    assert len(calls) == 1
+
+
+def test_unreadable_status_is_not_treated_as_helper_still_starting(monkeypatch, tmp_path):
+    assert read_service_status(tmp_path) is None
+    path = tmp_path / "desktop-service.json"
+    path.write_text("[]")
+    with pytest.raises(RecoveryError, match="Invalid"):
+        read_service_status(tmp_path)
+    def denied(*args, **kwargs):
+        raise PermissionError("administrator-owned status")
+    monkeypatch.setattr(Path, "read_text", denied)
+    with pytest.raises(RecoveryError, match="denied access.*do not reboot"):
+        read_service_status(tmp_path)
 
 
 def test_imported_identity_is_validated_before_display(prepared, session):

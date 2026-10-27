@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import shlex
 import signal
+import re
 import subprocess
 import sys
 import threading
@@ -19,7 +20,7 @@ import time
 
 from .config import RecoveryError, Session, atomic_json
 from .locking import ServiceLock
-from .network import HostNetwork
+from .network import HostNetwork, command, powershell
 from .server import serve
 
 
@@ -29,16 +30,53 @@ def app_command() -> list[str]:
     return [sys.executable, "-m", "spark_recovery.desktop"]
 
 
+def prepare_shared_state(root: Path):
+    """Keep elevated helper output readable by the unelevated session owner.
+
+    Windows mkdir(mode=0700) may grant OWNER RIGHTS rather than a named user.
+    A helper elevated as another administrator then creates files the GUI cannot
+    read. Add only this user's explicit, inheritable SID; never Everyone/Users.
+    icacls changes the DACL alone, without requiring SACL/security privileges.
+    """
+    if sys.platform != "win32":
+        return
+    sid = powershell("[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value").strip()
+    if not re.fullmatch(r"S-1-(?:[0-9]+-)*[0-9]+", sid):
+        raise RecoveryError("Cannot identify the Windows session owner; helper was not launched")
+    command(["icacls.exe", str(root.resolve()), "/grant", f"*{sid}:(OI)(CI)F"])
+
+
+def read_service_status(root: Path) -> dict | None:
+    try:
+        value = json.loads((root / "desktop-service.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except PermissionError as error:
+        raise RecoveryError("Windows denied access to the helper status. Recovery readiness is unknown; "
+                            "do not reboot the target. Repair this session's owner permissions before retrying.") from error
+    except (OSError, ValueError) as error:
+        raise RecoveryError(f"Cannot read the recovery helper status: {error}. Do not reboot the target.") from error
+    if not isinstance(value, dict):
+        raise RecoveryError("Invalid recovery helper status; do not reboot the target")
+    return value
+
+
 def launch(root: Path, operation="serve", *, stop_ics=False):
     if operation not in ("serve", "restore"):
         raise RecoveryError("Unsupported elevated desktop operation")
+    prepare_shared_state(root)
+    for name in ("desktop-stop", "desktop-service.json"):
+        (root / name).unlink(missing_ok=True)
     args = app_command() + ["--desktop-service", str(root.resolve()), "--operation", operation]
     if stop_ics:
         args.append("--stop-ics")
     if sys.platform == "win32":
-        outcome = ctypes.windll.shell32.ShellExecuteW(None, "runas", args[0],
-                                                     subprocess.list2cmdline(args[1:]), None, 0)
-        if outcome <= 32:
+        execute = ctypes.windll.shell32.ShellExecuteW
+        execute.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p,
+                            ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_int]
+        execute.restype = ctypes.c_void_p
+        outcome = execute(None, "runas", args[0], subprocess.list2cmdline(args[1:]), None, 0)
+        if not outcome or outcome <= 32:
             raise RecoveryError("Administrator authorization was canceled or could not start")
         return None
     if sys.platform == "darwin":
@@ -74,6 +112,8 @@ class ServiceStatus(logging.Handler):
         message = record.getMessage()
         if message.startswith("Serving ONLY"):
             self.set("ready", "Ethernet recovery services are ready; installation never starts without erase approval")
+        elif message.startswith("Recovery stage: "):
+            self.set("starting", message.removeprefix("Recovery stage: "))
 
 
 def run_service(root: Path, operation="serve", *, stop_ics=False) -> int:

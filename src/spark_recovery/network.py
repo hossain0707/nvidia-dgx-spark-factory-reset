@@ -22,7 +22,9 @@ def command(args: list[str]) -> str:
 
 
 def powershell(source: str) -> str:
-    source = "$ErrorActionPreference='Stop'; [Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); " + source
+    source = ("$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
+              "[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); "
+              "try { " + source + "; exit 0 } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }")
     encoded = base64.b64encode(source.encode("utf-16-le")).decode()
     return command(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded])
 
@@ -100,7 +102,7 @@ ConvertTo-Json -Depth 5 -Compress
                 powershell(f"""
 if ((Get-Service SharedAccess).Status -eq 'Running') {{ Stop-Service SharedAccess }};
 Set-NetIPInterface -InterfaceIndex {index} -AddressFamily IPv4 -Dhcp Disabled;
-if (-not (Get-NetIPAddress -InterfaceIndex {index} -AddressFamily IPv4 | Where-Object IPAddress -eq '{config.server}')) {{
+if (-not (Get-NetIPAddress -InterfaceIndex {index} -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object IPAddress -eq '{config.server}')) {{
 New-NetIPAddress -InterfaceIndex {index} -IPAddress '{config.server}' -PrefixLength {config.prefix} | Out-Null }}
 """)
                 python = str(Path(sys.executable).resolve()).replace("'", "''")
@@ -135,7 +137,7 @@ New-NetFirewallRule -Name '{name}-DHCP' -DisplayName '{name} DHCP' -Direction In
         if sys.platform == "win32":
             name = "SparkRecovery-" + config.session_id
             powershell(f"""
-Get-NetFirewallRule -Name '{name}-HTTP','{name}-TFTP','{name}-DHCP' -ErrorAction SilentlyContinue | Remove-NetFirewallRule;
+Get-NetFirewallRule -ErrorAction Stop | Where-Object {{ $_.Name -in @('{name}-HTTP','{name}-TFTP','{name}-DHCP') }} | Remove-NetFirewallRule;
 """)
             if state["added_address"]:
                 powershell(f"Get-NetIPAddress -InterfaceIndex {index} -AddressFamily IPv4 | Where-Object IPAddress -eq '{config.server}' | Remove-NetIPAddress -Confirm:$false")
@@ -145,7 +147,7 @@ Get-NetFirewallRule -Name '{name}-HTTP','{name}-TFTP','{name}-DHCP' -ErrorAction
                     continue
                 prefix = int(original["PrefixLength"])
                 powershell(f"""
-if (-not (Get-NetIPAddress -InterfaceIndex {index} -AddressFamily IPv4 | Where-Object IPAddress -eq '{ip}')) {{
+if (-not (Get-NetIPAddress -InterfaceIndex {index} -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object IPAddress -eq '{ip}')) {{
 New-NetIPAddress -InterfaceIndex {index} -IPAddress '{ip}' -PrefixLength {prefix} | Out-Null }}
 """)
             if state["windows"]["dhcp"] == "Enabled":

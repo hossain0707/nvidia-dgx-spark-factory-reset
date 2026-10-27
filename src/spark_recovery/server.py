@@ -57,6 +57,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
 
 def serve(root: Path, session: Session, manage: bool, stop_ics: bool, *, http_handler=None):
     require_admin()
+    logging.info("Recovery stage: Helper started; verifying full ISO and boot-file hashes")
     image = image_manifest(root, session, full=True)
     check_active_menu(root, session, image)
     if (root / "network.json").exists():
@@ -65,11 +66,13 @@ def serve(root: Path, session: Session, manage: bool, stop_ics: bool, *, http_ha
     stop = threading.Event()
     with ExitStack() as resources:
         if manage:
+            logging.info("Recovery stage: Image verified; applying the approved host-network plan")
             network.apply(stop_ics=stop_ics)
             resources.callback(network.restore)
         if not interface_has_address(session):
             raise RecoveryError("Server IP not assigned; use --manage-network or configure the Ethernet IP first")
         # Binding these ports is also a fail-closed check for existing services.
+        logging.info("Recovery stage: Host address configured; binding DHCP, TFTP and HTTP services")
         dhcp = DHCPServer(session)
         resources.callback(dhcp.close)
         tftp = TFTPServer(root / "tftp", session.server, {session.client, session.server})
