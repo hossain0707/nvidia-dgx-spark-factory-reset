@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="390" viewBox="0 0 1120 390" role="img" aria-labelledby="title desc">
+<title id="title">MKD Spark Recovery visual user manual</title>
+<desc id="desc">A Windows, Mac or Linux recovery host connects directly by isolated Ethernet to a supported ASUS GX10 or preview Dell FCM1253. The target also needs power, a monitor and a working keyboard. No USB storage drive is needed.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1726"/><stop offset="1" stop-color="#15313b"/></linearGradient></defs>
+<rect width="1120" height="390" rx="20" fill="url(#bg)"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<text x="36" y="39" fill="#4de4cc" font-size="13" font-weight="700" letter-spacing="2">MKD / RECOVERY · USER MANUAL · 0.3 PREVIEW</text>
+<text x="36" y="85" fill="#f1f7ff" font-size="34" font-weight="700">A guided reset over Ethernet.</text>
+<text x="36" y="114" fill="#b4c8db" font-size="16">Verify the device. Prove the boot path. Approve the exact SSD.</text>
+<rect x="36" y="149" width="322" height="158" rx="12" fill="#102134" stroke="#416178"/>
+<path d="M60 179h43v28H60z M55 214h53" fill="none" stroke="#4de4cc" stroke-width="3"/>
+<text x="124" y="184" fill="#f1f7ff" font-size="20" font-weight="700">RECOVERY HOST</text>
+<text x="124" y="209" fill="#bdd0e0" font-size="15">Windows / macOS / Linux</text>
+<text x="58" y="252" fill="#bdd0e0" font-size="15">Desktop: Windows x64 + Mac</text>
+<text x="58" y="279" fill="#bdd0e0" font-size="15">Terminal: all three host platforms</text>
+<path d="M374 229h356" stroke="#4de4cc" stroke-width="4"/>
+<path d="m716 221 14 8-14 8 M388 221l-14 8 14 8" fill="none" stroke="#4de4cc" stroke-width="3"/>
+<rect x="416" y="176" width="270" height="34" rx="17" fill="#214a4e"/>
+<text x="551" y="198" text-anchor="middle" fill="#70f2db" font-size="14" font-weight="700">DIRECT / ISOLATED ETHERNET</text>
+<text x="551" y="263" text-anchor="middle" fill="#bdd0e0" font-size="14">No shared office LAN</text>
+<rect x="746" y="149" width="338" height="158" rx="12" fill="#102134" stroke="#416178"/>
+<rect x="770" y="173" width="37" height="37" rx="7" fill="none" stroke="#4de4cc" stroke-width="3"/>
+<text x="824" y="184" fill="#f1f7ff" font-size="20" font-weight="700">TARGET DEVICE</text>
+<text x="824" y="209" fill="#bdd0e0" font-size="15">ASUS GX10 / Dell FCM1253*</text>
+<text x="768" y="252" fill="#bdd0e0" font-size="15">Keep power + monitor + keyboard</text>
+<text x="768" y="279" fill="#bdd0e0" font-size="15">No USB storage drive required</text>
+<text x="36" y="342" fill="#ffd18a" font-size="15">* Dell: official media inspected; physical Ethernet reset remains unqualified.</text>
+<text x="36" y="369" fill="#a8bfd1" font-size="14">Back up target data first. This is an OS reinstall; it does not promise secure SSD sanitization.</text>
+</g></svg>

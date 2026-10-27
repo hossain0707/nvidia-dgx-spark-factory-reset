@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="580" viewBox="0 0 1120 580" role="img" aria-labelledby="title desc">
+<title id="title">Five recovery stages and the expected outcome at each stage</title>
+<desc id="desc">Detect and authenticate; prepare the correct official image; prove a non-erasing PXE boot; explicitly authorize the SSD and confirm at the target console; observe first boot and restore host networking. Download completion alone is not reset success.</desc>
+<rect width="1120" height="580" rx="20" fill="#0c1828"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<text x="30" y="42" font-size="23" font-weight="700" fill="#eff6ff">YOUR FIVE-STEP ROUTE</text>
+<text x="30" y="70" font-size="15" fill="#aac2d6">Follow the app in order. A failed check is a stop condition.</text>
+<g fill="#14283b" stroke="#36556c"><rect x="30" y="94" width="1060" height="76" rx="10"/><rect x="30" y="180" width="1060" height="76" rx="10"/><rect x="30" y="266" width="1060" height="76" rx="10"/><rect x="30" y="352" width="1060" height="92" rx="10" stroke="#ebaa61"/><rect x="30" y="454" width="1060" height="76" rx="10"/></g>
+<g fill="#4de4cc" font-size="27" font-weight="700"><text x="51" y="140">01</text><text x="51" y="226">02</text><text x="51" y="312">03</text><text x="51" y="402" fill="#ffd18a">04</text><text x="51" y="500">05</text></g>
+<g fill="#eff6ff" font-size="19" font-weight="700"><text x="114" y="124">Detect the connected device</text><text x="114" y="210">Prepare &amp; inspect</text><text x="114" y="296">Prove the recovery path</text><text x="114" y="383">Authorize the exact SSD</text><text x="114" y="484">Measure &amp; finish</text></g>
+<g fill="#bdd0e0" font-size="15"><text x="114" y="150">Choose the correct wired link; verify SSH trust; sign in.</text><text x="114" y="236">Accept OEM terms; verify the full image hash and boot files.</text><text x="114" y="322">Approve network setup and diagnostic reboot; wait for checks.</text><text x="114" y="410">Review MAC + disk + serial + image; type ERASE and the serial.</text><text x="114" y="431">Then reboot into PXE and make the final target-console choice.</text><text x="114" y="510">Confirm fresh first boot, finish timing, restore host networking.</text></g>
+<g font-size="13" font-weight="700"><text x="787" y="137" fill="#4de4cc">PASS: VERIFIED IDENTITY</text><text x="787" y="223" fill="#4de4cc">PASS: MATCHING OEM IMAGE</text><text x="787" y="309" fill="#4de4cc">PASS: SSD HIDDEN IN DIAGNOSTICS</text><text x="787" y="395" fill="#ffd18a">PERMANENT DATA LOSS</text><text x="787" y="497" fill="#4de4cc">SUCCESS: OBSERVED FIRST BOOT</text></g>
+<text x="30" y="558" font-size="14" fill="#ffd18a">100% ISO transfer means the image arrived. It does not mean the SSD installation succeeded.</text>
+</g></svg>

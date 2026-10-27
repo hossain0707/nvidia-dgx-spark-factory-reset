@@ -5,6 +5,7 @@
 <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&amp;logoColor=white" alt="Python 3.11+">
 <img src="https://img.shields.io/badge/Hosts-Windows%20%7C%20macOS%20%7C%20Linux-198b79" alt="Host adapters">
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MKD%20Personal%20Use-8a63d2" alt="MKD Personal Use license"></a>
+<a href="docs/USER-MANUAL.md"><img src="https://img.shields.io/badge/User%20Manual-Visual%20Guide-22c7b8?logo=readthedocs&amp;logoColor=white" alt="User manual — visual guide"></a>
 </p>
 
 <p align="center"><strong>No USB storage drive. No default erase. No silent reboot.</strong></p>
