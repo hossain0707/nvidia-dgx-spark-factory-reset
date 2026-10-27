@@ -32,12 +32,26 @@ def inventory():
             board.append(Path(path).read_text().strip("\0\n"))
         except OSError:
             continue
+    def identity(path):
+        try:
+            return Path(path).read_text().strip("\0\n")
+        except OSError:
+            return ""
+    efi = Path("/sys/firmware/efi").is_dir()
+    try:
+        boots = execute(["efibootmgr", "-v"]) if efi else ""
+    except (RuntimeError, OSError):
+        boots = ""  # Missing read permissions must not prevent read-only identification.
+    addresses = json.loads(execute(["ip", "-json", "address"]))
     return {"hostname": execute(["hostname"]).strip(), "machine": os.uname().machine,
             "board": board, "interfaces": interfaces,
+            "manufacturer": identity("/sys/class/dmi/id/sys_vendor"),
+            "product": identity("/sys/class/dmi/id/product_name"),
+            "addresses": {item["ifname"]: [entry["local"] + "/" + str(entry["prefixlen"])
+                          for entry in item.get("addr_info", [])] for item in addresses},
             "disks": json.loads(execute(["lsblk", "--json", "--bytes", "--nodeps", "--output",
                                          "NAME,TYPE,SIZE,MODEL,SERIAL"]))["blockdevices"],
-            "efi": Path("/sys/firmware/efi").is_dir(),
-            "boots": execute(["efibootmgr", "-v"]) if Path("/sys/firmware/efi").is_dir() else ""}
+            "efi": efi, "boots": boots}
 
 
 def select_pxe(text: str, mac: str) -> str:

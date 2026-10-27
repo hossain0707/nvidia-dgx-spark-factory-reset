@@ -149,7 +149,7 @@ def verify_bootloader(path: Path) -> None:
 
 
 def prepare(root: Path, session: Session, iso: Path | None = None, package: Path | None = None,
-            bootloader: Path | None = None, *, progress=None) -> dict:
+            bootloader: Path | None = None, *, progress=None, cache_dir: Path | None = None) -> dict:
     import pycdlib
     def stage(message):
         if progress:
@@ -157,14 +157,14 @@ def prepare(root: Path, session: Session, iso: Path | None = None, package: Path
     stage("Checking available storage and official artifacts")
     root.mkdir(parents=True, exist_ok=True)
     if iso is None:
-        assets = root / "assets"
-        assets.mkdir(exist_ok=True)
-        if package is None:
-            if shutil.disk_usage(root).free < 24 * 1024**3:
-                raise RecoveryError("Allow at least 24 GiB free to download and unpack the ASUS package")
-            package = download(ASUS["url"], assets / "asus-package.zip", ASUS["package_sha256"], progress=progress)
+        assets = cache_dir or root / "assets"
+        assets.mkdir(parents=True, exist_ok=True)
         iso = assets / "recovery.iso"
         if not iso.exists() or digest(iso) != ASUS["iso_sha256"]:
+            if package is None:
+                if shutil.disk_usage(assets).free < 24 * 1024**3:
+                    raise RecoveryError("Allow at least 24 GiB free to download and unpack the ASUS package")
+                package = download(ASUS["url"], assets / "asus-package.zip", ASUS["package_sha256"], progress=progress)
             stage("Verifying package and extracting ASUS ISO")
             extract_package(package, iso)
     iso = iso.resolve()

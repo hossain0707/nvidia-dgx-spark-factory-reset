@@ -7,9 +7,12 @@
 | Packaged macOS host | Portable tests, macOS CI and mocked alias changes | Preview; physical Mac/Ethernet/GX10 test needed |
 | Packaged Linux host | Portable tests, Linux CI and mocked alias changes | Preview; physical host/GX10 test needed |
 | Local Linux target inventory and BootNext | Parsing/input checks and matching-MAC selection tests | Requires ARM64 UEFI, efibootmgr, lsblk; reboot needs root |
-| SSH target control | Command construction and strict-key behavior tested | Existing trusted SSH; root changes need preauthorized noninteractive sudo |
-| NVIDIA DGX Spark Founders Edition | Different recovery media and firmware flow | Not implemented |
-| Dell/HP/Lenovo/MSI/other OEM variants | No corresponding image adapter/qualification | Not implemented |
+| SSH target control | Strict key checks, explicit app-local key rotation and authenticated inventory | Existing keys or ephemeral password; root/reboot needs separate consent/sudo authorization |
+| Automatic discovery | Windows/macOS/Linux parsers; bounded interface-scoped probes; IPv6 and collision-aware plans | Preview; SSH and reachable networking remain necessary |
+| Automatic ASUS diagnostics | Read-only temporary RAM observer; token/image/session bindings; generated against actual pinned initrd | Preview; new diagnostic hardware boot trial required |
+| Dell GB10 FCM1253 | Separate manufacturer/model detection and Dell official recovery guidance | Vendor-guided only; no qualified Ethernet erase adapter |
+| NVIDIA DGX Spark Founders Edition | Separate identity and FastOS recovery path | Recognized; own image adapter not implemented |
+| HP ZGX / Lenovo PGX / MSI EdgeXpert | Model recognition and manufacturer support routing | No qualified image/erase adapter |
 
 Passing the CI matrix means the software's **automated tests** passed on that runner, not that it erased and recovered real hardware there. A preview badge is intentional. Do not turn this document into a universal-support claim without documented qualification.
 
@@ -23,7 +26,7 @@ Passing the CI matrix means the software's **automated tests** passed on that ru
 
 ## Unsupported shortcuts
 
-No generic ISO injection, unknown OEM profile override, secure-boot bypass, automatic host-key deletion, password collection, fully unattended SSD erase, or same-machine-only PXE recovery. A local/SSH target command cannot remove the need for a separate recovery server and final console confirmation.
+No generic ISO substitution, unknown OEM override, secure-boot bypass, silent host-key deletion, password persistence, fully unattended SSD erase, or same-machine-only PXE recovery. Transient credentials are optional in the new automatic flow; existing keys can be used instead. A separate server and final console erase confirmation remain required. See [automation and OEM status](AUTOMATION.md).
 
 ## Adding another image
 

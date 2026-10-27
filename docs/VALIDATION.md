@@ -13,6 +13,8 @@ The one-off scripts were subsequently replaced by this package. The package has 
 
 ## Automated checks
 
+The 0.3 suite additionally covers localized Windows adapter/neighbor parsing, default-gateway/Wi-Fi exclusions, bounded discovery, route-aware subnet allocation, authenticated IP-to-MAC evidence, multi-OEM routing/refusal, app-local host-key rotation, read-only observer generation, token-bound report handling and stale/failed evidence. These are simulated/protocol tests, not an end-to-end hardware claim. The derived diagnostic initrd was generated from the actual pinned ASUS media; booting that observer on real hardware is still a qualification step.
+
 Desktop preview adds monotonic timing and interruption/sequence tests, noninteractive bounded SSH checks, helper operation/readiness tests, and an offscreen GUI smoke test. Desktop builds smoke-test the frozen executable on Windows x64 and Mac arm64/x64. These checks never request administrator permission, bind real DHCP, reboot a target or erase disks. They do not establish destructive end-to-end desktop qualification.
 
 CI runs Python 3.11/3.12 on Windows, macOS and Linux. Tests exercise configuration/input rejection, firmware/kernel DHCP packets, OS interface-binding parameters, missing/stale consent, wrong OEM/MAC/SSD serial, safe archive extraction, boot-file mutation, advisory-lock exclusion, mocked network cleanup/failure paths, HTTP allowlisting and TFTP end-of-file/loss/duplicate ACK/rollover/path/upload behavior.

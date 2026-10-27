@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -13,10 +14,14 @@ import uuid
 from . import __version__
 from .cli import ssh_command
 from .config import RecoveryError, Session, atomic_json
+from .connection import DeviceConnection, configured_user, key_status, trust_key
+from .discovery import choose_adapter, collect_adapters, discover, network_plan, refresh_link_local, target_mac
 from .desktop_service import launch, run_service
 from .images import prepare
 from .locking import ServiceLock
 from .network import command, powershell
+from .oem import detect_oem
+from .profiles import ASUS
 from .safety import attest, authorize, image_manifest, validate_inventory, write_menu
 from .timing import RecoveryTiming, duration
 
@@ -25,7 +30,7 @@ def inspect_ssh(destination: str):
     source = Path(__file__).with_name("target.py").read_text(encoding="utf-8")
     args = ssh_command(destination, source)
     args[1:1] = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
-    result = subprocess.run(args, capture_output=True, text=True, timeout=35)
+    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=35)
     if result.returncode:
         raise RecoveryError("SSH inspection failed. Configure a trusted host key and SSH key first, or import local "
                             "inventory JSON. Passwords are not collected by this app. " + result.stderr.strip())
@@ -66,6 +71,8 @@ def inventory_disks(inventory, session):
                 or not isinstance(item.get("type"), str) or not isinstance(item.get("serial") or "", str)):
             raise RecoveryError("Invalid disk identity in target inventory")
         if item["type"] == "disk" and item["name"].startswith("nvme") and item.get("serial"):
+            if not re.fullmatch(r"[ -~]{1,128}", item["serial"].strip()):
+                raise RecoveryError("Disk serial contains unsupported control/formatting characters")
             validate_inventory(inventory, session, "/dev/" + item["name"], item["serial"].strip())
             candidates.append(item)
     if not candidates:
@@ -83,11 +90,12 @@ def main(argv=None):
     if args.desktop_service:
         return run_service(args.desktop_service, args.operation, stop_ics=args.stop_ics)
     try:
-        from PySide6.QtCore import QStandardPaths, QThread, QTimer, Qt, Signal
-        from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPainter, QPixmap
+        from PySide6.QtCore import QStandardPaths, QThread, QTimer, Qt, Signal, QUrl
+        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter, QPixmap
         from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
                                       QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit,
-                                      QProgressBar, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget)
+                                      QProgressBar, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
+                                      QDialog, QDialogButtonBox, QGroupBox)
     except ImportError:
         print('Install the desktop extra: python -m pip install ".[desktop]"', file=sys.stderr)
         return 2
@@ -123,6 +131,16 @@ def main(argv=None):
             self.services = False
             self.seen_phase = ""
             self.current_step = 0
+            self.adapters = []
+            self.peers = []
+            self.device = None
+            self.detected_adapter = None
+            self.auto_flow = False
+            self.reboot_offered = False
+            self.follow_up = None
+            self.prompted_peers = set()
+            self.discovery_due = time.monotonic() + 20
+            self.periodic_discovery = False
             self.data_dir = Path(QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation))
             outer = QWidget()
             self.setCentralWidget(outer)
@@ -152,7 +170,7 @@ def main(argv=None):
             navigation.addWidget(self.clock_label)
             navigation.addWidget(QLabel("Elapsed since session creation\nIncludes preparation and waiting"))
             navigation.addSpacing(20)
-            navigation.addWidget(QLabel("ASUS GX10 only\nCommunity preview · No telemetry"))
+            navigation.addWidget(QLabel("OEM identity checks\nASUS PXE · Other OEMs guided\nPreview · No telemetry"))
             row.addWidget(rail)
             content = QVBoxLayout()
             content.setContentsMargins(30, 26, 30, 24)
@@ -162,7 +180,7 @@ def main(argv=None):
             self.heading = QLabel("A guided path to a fresh start.")
             self.heading.setObjectName("heading")
             content.addWidget(self.heading)
-            subtitle = QLabel("Dedicated Ethernet. Verified ASUS media. You control the final erase.")
+            subtitle = QLabel("Detect your device. Use its manufacturer's recovery path. Confirm before erasing.")
             subtitle.setWordWrap(True)
             content.addWidget(subtitle)
             self.pages = QStackedWidget()
@@ -183,6 +201,8 @@ def main(argv=None):
             self.verify_page()
             self.install_page()
             self.finish_page()
+            for label in self.findChildren(QLabel):
+                label.setTextFormat(Qt.TextFormat.PlainText)
             self.show_step(0)
             self.timer = QTimer(self)
             self.timer.timeout.connect(self.tick)
@@ -216,25 +236,49 @@ def main(argv=None):
             return button
 
         def setup_page(self):
-            layout = self.page("01 / Connect & identify", "Connect the GX10 directly to this computer. Keep its monitor "
-                               "and keyboard connected. Back up its data. Select Ethernet, not Wi-Fi.")
+            layout = self.page("01 / Detect the connected device", "Connect your Spark-class device directly by Ethernet. "
+                               "The app detects the link, address, MAC, manufacturer and SSD after authenticated access. "
+                               "Credentials and firmware access cannot be guessed or bypassed.")
+            self.discovery_label = QLabel("Waiting to detect your wired connection…")
+            self.discovery_label.setWordWrap(True)
+            layout.addWidget(self.discovery_label)
+            self.detect = self.button("Detect connected device", self.auto_discover, layout)
+            self.isolated = QCheckBox("This is a direct cable / isolated link. Allow a bounded search if needed.")
+            self.isolated.toggled.connect(lambda checked: self.after_job(self.auto_discover)
+                if checked and not self.root else None)
+            layout.addWidget(self.isolated)
+            self.peer_list = QComboBox()
+            layout.addWidget(self.peer_list)
+            self.connect_button = self.button("Connect securely and auto-fill recovery details", self.connect_discovered, layout)
+            self.brand_label = QLabel("A network response is not proof of device brand. Identity is checked after login.")
+            self.brand_label.setWordWrap(True)
+            layout.addWidget(self.brand_label)
+            self.advanced = QGroupBox("Advanced / manual network settings")
+            advanced_layout = QVBoxLayout(self.advanced)
             form = QFormLayout()
             form.setVerticalSpacing(12)
             self.interface = QComboBox()
             self.interface.setEditable(True)
             form.addRow("Host Ethernet adapter", self.interface)
-            self.server = QLineEdit("172.31.250.1")
-            self.client = QLineEdit("172.31.250.2")
+            self.server = QLineEdit()
+            self.server.setPlaceholderText("Detected automatically")
+            self.client = QLineEdit()
+            self.client.setPlaceholderText("Detected or allocated automatically")
             self.mac = QLineEdit()
             self.mac.setPlaceholderText("Target Ethernet MAC from firmware, e.g. 02:00:00:00:00:01")
             form.addRow("Host IPv4 /24", self.server)
             form.addRow("GX10 recovery IPv4", self.client)
             form.addRow("GX10 Ethernet MAC", self.mac)
-            layout.addLayout(form)
-            self.refresh = self.button("Refresh adapter list", self.refresh_interfaces, layout)
+            advanced_layout.addLayout(form)
+            self.refresh = self.button("Refresh adapter list", self.refresh_interfaces, advanced_layout)
             self.backup = QCheckBox("I have backed up the GX10 and am using an isolated Ethernet link.")
-            layout.addWidget(self.backup)
-            self.create = self.button("Create safe recovery session →", self.create_session, layout)
+            advanced_layout.addWidget(self.backup)
+            self.create = self.button("Create manual recovery session →", self.create_session, advanced_layout)
+            toggle = QPushButton("Show / hide advanced settings")
+            toggle.clicked.connect(lambda: self.advanced.setVisible(not self.advanced.isVisible()))
+            layout.addWidget(toggle)
+            layout.addWidget(self.advanced)
+            self.advanced.hide()
             self.resume = self.button("Open an existing desktop session…", self.open_session, layout)
             self.location = QLabel("Sessions and timing reports stay on this computer.")
             self.location.setWordWrap(True)
@@ -249,6 +293,8 @@ def main(argv=None):
             layout.addWidget(self.iso)
             self.browse = self.button("Choose existing ASUS ISO…", self.choose_iso, layout)
             self.vendor = QCheckBox("I accept the vendor download terms and have at least 24 GiB free disk space.")
+            self.vendor.toggled.connect(lambda checked: self.after_job(self.prepare_media)
+                if checked and self.auto_flow and self.root and not (self.root / "image.json").exists() else None)
             layout.addWidget(self.vendor)
             self.prepare_button = self.button("Verify and prepare recovery image", self.prepare_media, layout)
             layout.addSpacing(12)
@@ -270,6 +316,7 @@ def main(argv=None):
             self.ics.setVisible(sys.platform == "win32")
             layout.addWidget(self.ics)
             self.start = self.button("Start Ethernet recovery services", self.start_services, layout)
+            self.reboot_button = self.button("Restart the verified target into diagnostic PXE…", self.reboot_target, layout)
             instructions = QPlainTextEdit("1. Wait for 'services ready' below.\n"
                 "2. On the GX10, reboot into its UEFI PXE IPv4 entry.\n"
                 "3. Select VERIFY ONLY (STOP is the default).\n"
@@ -279,12 +326,14 @@ def main(argv=None):
                 "no /dev/nvme* devices exist. Do not type exit to install.")
             instructions.setReadOnly(True)
             instructions.setMinimumHeight(225)
+            self.diagnostic_instructions = instructions
             layout.addWidget(instructions)
             self.checks = [QCheckBox(text) for text in ("ISO is mounted read-only at /cdrom.",
                             "Both ASUS OEM files/directories are visible.", "No NVMe devices are exposed.")]
             for check in self.checks:
                 layout.addWidget(check)
             self.attest_button = self.button("Record diagnostic checks →", self.record_diagnostic, layout)
+            self.manual_check_button = self.button("Show manual diagnostic fallback", self.manual_diagnostic, layout)
             layout.addStretch()
 
         def install_page(self):
@@ -342,12 +391,12 @@ def main(argv=None):
             self.notice("Stopped: " + text)
             QMessageBox.warning(self, "Action stopped", text)
 
-        def work(self, function, done):
+        def work(self, function, done, error=None):
             if self.job:
                 return
             self.job = Job(function)
             self.job.done.connect(done)
-            self.job.failed.connect(self.problem)
+            self.job.failed.connect(error or self.problem)
             self.job.progress.connect(self.show_progress)
             self.job.finished.connect(self.job_finished)
             self.activity.setRange(0, 0)
@@ -370,6 +419,230 @@ def main(argv=None):
             self.job = None
             self.activity.setRange(0, 1)
             self.buttons()
+            callback, self.follow_up = self.follow_up, None
+            if callback:
+                QTimer.singleShot(0, callback)
+
+        def after_job(self, callback):
+            if self.job:
+                self.follow_up = callback
+            else:
+                QTimer.singleShot(0, callback)
+
+        def consent(self, title, text, checklist, *, phrase="", password=False):
+            dialog = QDialog(self)
+            dialog.setWindowTitle(title)
+            dialog.setMinimumWidth(620)
+            layout = QVBoxLayout(dialog)
+            label = QLabel(text)
+            label.setTextFormat(Qt.TextFormat.PlainText)
+            label.setWordWrap(True)
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            layout.addWidget(label)
+            checks = [QCheckBox(item) for item in checklist]
+            for check in checks:
+                layout.addWidget(check)
+            field = QLineEdit()
+            if phrase:
+                field.setPlaceholderText("Type exactly: " + phrase)
+                layout.addWidget(field)
+            secret = QLineEdit()
+            secret.setEchoMode(QLineEdit.EchoMode.Password)
+            if password:
+                secret.setPlaceholderText("Target sudo password (optional if sudo is already authorized)")
+                layout.addWidget(secret)
+            actions = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+            actions.button(QDialogButtonBox.StandardButton.Ok).setText("I understand — continue")
+            actions.button(QDialogButtonBox.StandardButton.Ok).setDefault(False)
+            actions.button(QDialogButtonBox.StandardButton.Cancel).setDefault(True)
+            actions.accepted.connect(dialog.accept)
+            actions.rejected.connect(dialog.reject)
+            layout.addWidget(actions)
+            def enable():
+                actions.button(QDialogButtonBox.StandardButton.Ok).setEnabled(all(item.isChecked() for item in checks)
+                    and (not phrase or field.text() == phrase))
+            for check in checks:
+                check.toggled.connect(enable)
+            field.textChanged.connect(enable)
+            enable()
+            accepted = dialog.exec() == QDialog.DialogCode.Accepted
+            value = secret.text() if accepted and password else None
+            secret.clear()
+            dialog.deleteLater()
+            return accepted, value
+
+        def auto_discover(self):
+            if self.root or self.job:
+                return
+            isolated = self.isolated.isChecked()
+            if self.periodic_discovery:
+                isolated = False
+            self.periodic_discovery = False
+            self.discovery_due = time.monotonic() + 20
+            selected = self.interface.currentData()
+            def scan():
+                adapters = collect_adapters()
+                if selected:
+                    adapter = next((item for item in adapters if item.id == selected), None)
+                    if adapter is None or not adapter.wired or not adapter.up:
+                        raise RecoveryError("Selected adapter is not an active wired link")
+                else:
+                    try:
+                        adapter = choose_adapter(adapters)
+                    except RecoveryError:
+                        return adapters, None, []
+                refresh_link_local(adapter)
+                refreshed = collect_adapters()
+                adapter = next((item for item in refreshed if item.id == adapter.id), adapter)
+                return adapters, adapter, discover(adapter, active=isolated)
+            def found(value):
+                adapters, adapter, peers = value
+                self.adapters, self.detected_adapter, self.peers = adapters, adapter, peers
+                self.interface.clear()
+                for item in adapters:
+                    if item.wired:
+                        self.interface.addItem(f"{item.name} · {item.id}", item.id)
+                self.interface.setCurrentIndex(self.interface.findData(adapter.id) if adapter else -1)
+                self.peer_list.clear()
+                for peer in peers:
+                    self.peer_list.addItem(peer.address + " · SSH device (identity not yet verified)")
+                if adapter is None:
+                    self.advanced.show()
+                    self.discovery_label.setText("Multiple or no dedicated links found. Choose the connected wired adapter below, then detect again.")
+                    return
+                self.discovery_label.setText(f"Ethernet: {adapter.name} · {len(peers)} SSH endpoint(s) found.")
+                self.notice("Select a device and connect to verify its model." if peers else
+                    "No accessible SSH endpoint found. Confirm the isolated-link checkbox and retry. "
+                    "If SSH is disabled or the device has no usable network address, enable it on the target first.")
+                if len(peers) == 1 and peers[0].address not in self.prompted_peers:
+                    self.prompted_peers.add(peers[0].address)
+                    self.after_job(self.connect_discovered)
+            self.notice("Detecting the wired link and checking bounded, interface-scoped SSH endpoints…")
+            self.work(scan, found, error=self.notice)
+
+        def connect_discovered(self):
+            if self.job or self.root or not self.peers:
+                return
+            peer = self.peers[self.peer_list.currentIndex()]
+            known_hosts = self.data_dir / "known_hosts"
+            def inspect_trust():
+                return key_status(peer, self.detected_adapter, known_hosts), configured_user(peer.address)
+            def trust_and_login(value):
+                observed, configured = value
+                if observed["state"] != "trusted":
+                    changed = observed["state"] == "changed"
+                    approved, _ = self.consent("Verify device SSH identity", f"Device address: {peer.address}\n"
+                        f"SSH key: {observed['kind']}\nFingerprint: {observed['fingerprint']}\n\n" +
+                        ("WARNING: this key differs from a previously trusted key. A reset or an impostor can cause this.\n" if changed else "This is the first verified connection to this key.\n") +
+                        "Compare the fingerprint on the physical target (ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub "
+                        "for an Ed25519 key). A network address alone does not establish identity. "
+                        "This app will record trust locally without changing global OpenSSH keys.",
+                        ["I compared this fingerprint on the intended physical device."],
+                        phrase="TRUST CHANGED KEY" if changed else "")
+                    if not approved:
+                        return
+                    try:
+                        trust_key(peer, observed, known_hosts, replace=changed)
+                    except (RecoveryError, OSError, ValueError) as error:
+                        self.problem(str(error))
+                        return
+                dialog = QDialog(self)
+                dialog.setWindowTitle("Sign in to the detected device")
+                layout = QFormLayout(dialog)
+                label = QLabel("Use the account on the Spark, not this computer's account. "
+                               "Existing SSH keys are tried first. Passwords are not saved to disk.")
+                label.setWordWrap(True)
+                layout.addRow(label)
+                username, password = QLineEdit(configured), QLineEdit()
+                password.setEchoMode(QLineEdit.EchoMode.Password)
+                password.setPlaceholderText("Optional when an existing SSH key works")
+                layout.addRow("Device account", username)
+                layout.addRow("Device password", password)
+                actions = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+                actions.accepted.connect(dialog.accept)
+                actions.rejected.connect(dialog.reject)
+                layout.addRow(actions)
+                if dialog.exec() != QDialog.DialogCode.Accepted:
+                    password.clear()
+                    dialog.deleteLater()
+                    return
+                account, secret = username.text().strip(), password.text()
+                password.clear()
+                dialog.deleteLater()
+                def authenticate():
+                    device = DeviceConnection(peer, self.detected_adapter, account, known_hosts, secret)
+                    try:
+                        return device, device.inventory()
+                    except BaseException:
+                        device.close()
+                        raise
+                # The trust-inspection worker's finished signal is queued after its result.
+                self.after_job(lambda: self.work(authenticate, self.accept_detected))
+            self.work(inspect_trust, trust_and_login)
+
+        def accept_detected(self, value):
+            device, inventory = value
+            def accept():
+                profile = detect_oem(inventory)
+                self.brand_label.setText(f"Verified model: {profile.manufacturer} {profile.model}\n{profile.explanation}")
+                if not profile.image_profile:
+                    device.close()
+                    box = QMessageBox(self)
+                    box.setWindowTitle(profile.manufacturer + " recovery profile")
+                    box.setText(profile.explanation + "\n\nThis device will not receive an ASUS image. "
+                                "Open the manufacturer's own recovery instructions?")
+                    box.setStandardButtons(QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Cancel)
+                    if box.exec() == QMessageBox.StandardButton.Open:
+                        QDesktopServices.openUrl(QUrl(profile.recovery_url))
+                    return
+                mac = target_mac(inventory, device.peer)
+                session = network_plan(self.detected_adapter, device.peer, mac)
+                inventory_disks(inventory, session)
+                root = self.data_dir / "sessions" / uuid.uuid4().hex
+                root.mkdir(parents=True, mode=0o700)
+                session.save(root)
+                self.root, self.session, self.device = root, session, device
+                self.auto_flow = True
+                self.erase_phrase.hide()
+                self.server.setText(session.server)
+                self.client.setText(session.client)
+                self.mac.setText(session.target_mac)
+                self.timing = RecoveryTiming(root / "timing.json")
+                self.timing.mark("session_created")
+                self.location.setText(str(root))
+                self.save_inventory(inventory)
+                for manifest in sorted((self.data_dir / "sessions").glob("*/image.json"), key=lambda item: item.stat().st_mtime,
+                                       reverse=True):
+                    try:
+                        image = json.loads(manifest.read_text(encoding="utf-8"))
+                        if image.get("iso_sha256") == ASUS["iso_sha256"] and Path(image["iso_path"]).is_file():
+                            self.iso.setText(image["iso_path"])
+                            break
+                    except (OSError, ValueError, KeyError):
+                        continue
+                self.show_step(1)
+                self.notice("Device, MAC, SSD and network plan filled from authenticated evidence. "
+                            "Accept the vendor terms, then preparation and safe host setup will be guided automatically.")
+                self.buttons()
+            try:
+                accept()
+            except Exception as error:
+                device.close()
+                self.problem(str(error))
+
+        def reboot_target(self):
+            if not self.device or not self.services:
+                self.problem("A live authenticated target connection and ready host services are required")
+                return
+            approved, secret = self.consent("Restart target for diagnostic recovery",
+                f"Restart {self.session.target_mac} into its matching UEFI PXE IPv4 entry.\n"
+                "This stops its running applications and workloads. The diagnostic boot blocks NVMe and does not install. "
+                "If firmware/Secure Boot prevents PXE, the app cannot bypass that setting.",
+                ["I saved work and can interrupt workloads on this exact target.",
+                 "I understand this is a diagnostic reboot; no SSD erase is authorized."], password=True)
+            if approved:
+                self.work(lambda: self.device.boot(self.session.target_mac, sudo_password=secret or None),
+                          lambda value: self.notice("Diagnostic reboot requested. Watch the target's PXE/VERIFY ONLY screen."))
 
         def guarded(self, function):
             try:
@@ -406,6 +679,8 @@ def main(argv=None):
                 root.mkdir(parents=True, mode=0o700)
                 session.save(root)
                 self.root, self.session = root, session
+                self.auto_flow = (root / "diagnostic-agent.json").is_file()
+                self.erase_phrase.setVisible(not self.auto_flow)
                 self.timing = RecoveryTiming(root / "timing.json")
                 self.timing.mark("session_created")
                 self.location.setText(str(root))
@@ -422,6 +697,8 @@ def main(argv=None):
                 root = Path(path)
                 session = Session.load(root)
                 self.root, self.session = root, session
+                self.auto_flow = (root / "diagnostic-agent.json").is_file()
+                self.erase_phrase.setVisible(not self.auto_flow)
                 self.timing = RecoveryTiming.load(root / "timing.json") if (root / "timing.json").exists() else None
                 self.location.setText(str(root))
                 self.load_disks()
@@ -445,11 +722,40 @@ def main(argv=None):
             iso = Path(self.iso.text().strip()) if self.iso.text().strip() else None
             def operation():
                 with ServiceLock(self.root):
-                    return prepare(self.root, self.session, iso=iso, progress=self.job.progress.emit)
+                    cache = self.data_dir / "cache" / self.session.profile
+                    cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    with ServiceLock(cache):
+                        image = prepare(self.root, self.session, iso=iso, progress=self.job.progress.emit, cache_dir=cache)
+                    if self.auto_flow:
+                        from .diagnostic_agent import configure
+                        self.job.progress.emit({"stage": "Preparing a read-only temporary RAM diagnostic observer"})
+                        configure(self.root, self.session)
+                    return image
             def done(value):
                 self.mark("preparation_complete")
                 self.notice("Official image and boot files verified. Inspect the target before starting services.")
+                if self.auto_flow:
+                    self.diagnostic_instructions.setPlainText("The temporary RAM observer will report diagnostic checks "
+                        "automatically.\n\nAfter the consented reboot, VERIFY ONLY starts after five seconds. "
+                        "It blocks NVMe and cannot start installation.\n\nThe app waits for a session-bound report of: "
+                        "read-only ISO, ASUS OEM content, hidden NVMe and the matching MAC.\n\n"
+                        "No report or any failed check keeps installation blocked. Firmware/secure-boot failures "
+                        "still need attention at the target console.")
+                    for check in self.checks:
+                        check.hide()
+                    self.attest_button.hide()
+                    self.show_step(2)
+                    self.after_job(self.start_services)
             self.work(operation, done)
+
+        def manual_diagnostic(self):
+            self.diagnostic_instructions.setPlainText("Manual fallback: select VERIFY ONLY and wait at (initramfs).\n"
+                "Run separately:\n\nmount | grep /cdrom\nls /cdrom/oemdata\nls /dev/nvme*\n\n"
+                "Expect ISO9660 ro at /cdrom; oem-iso-cfg.sh and debs; no NVMe devices.\n"
+                "Only confirm checks you actually observed. Do not type exit to start installation.")
+            for check in self.checks:
+                check.show()
+            self.attest_button.show()
 
         def save_inventory(self, inventory):
             inventory_disks(inventory, self.session)
@@ -485,8 +791,9 @@ def main(argv=None):
         def update_phrase(self):
             value = self.disk.currentData()
             if value and self.session:
-                self.erase_label.setText("This will erase every file on " + value[0] + ". Type exactly:\nERASE " +
-                                         self.session.target_mac + " " + value[1])
+                self.erase_label.setText("Selected device MAC: " + self.session.target_mac + "\nWhole SSD: " + value[0] +
+                    "\nSerial: " + value[1] + "\nEnabling installation can erase every existing file." if self.auto_flow else
+                    "This will erase every file on " + value[0] + ". Type exactly:\nERASE " + self.session.target_mac + " " + value[1])
 
         def start_services(self):
             def start():
@@ -495,6 +802,20 @@ def main(argv=None):
                     raise RecoveryError("Inspect the target first")
                 if (self.root / "network.json").exists():
                     raise RecoveryError("A network journal exists. Confirm the old helper is stopped, then restore first")
+                approved, _ = self.consent("Allow temporary recovery network changes",
+                    f"Host interface: {self.session.interface}\nHost: {self.session.server}/{self.session.prefix}\n"
+                    f"Target lease: {self.session.client}\nTarget MAC: {self.session.target_mac}\n\n"
+                    "The privileged helper will temporarily configure this Ethernet link, serve DHCP/TFTP/HTTP, "
+                    "and restore its saved settings when stopped. Windows Internet Connection Sharing may be paused; "
+                    "that interrupts devices using it. Wi-Fi is not selected for recovery.",
+                    ["I backed up the target's data and this cable is isolated from other computers.",
+                     "I permit these temporary settings and any interruption of Windows ICS on this link."])
+                if not approved:
+                    return
+                atomic_json(self.root / "host-consent.json", {"session": self.session.fingerprint,
+                    "temporary_network_changes": True, "ics_interruption": True, "at": time.time()})
+                if sys.platform == "win32":
+                    self.ics.setChecked(True)
                 self.launch_helper("serve")
             self.guarded(start)
 
@@ -524,7 +845,20 @@ def main(argv=None):
                 value = self.disk.currentData()
                 if not value:
                     raise RecoveryError("Choose the inspected whole SSD")
-                authorize(self.root, self.session, value[0], value[1], self.erase_phrase.text())
+                phrase = self.erase_phrase.text()
+                if self.auto_flow:
+                    approved, _ = self.consent("Permanent target SSD erasure",
+                        f"Target Ethernet MAC: {self.session.target_mac}\nWhole SSD: {value[0]}\nSerial: {value[1]}\n"
+                        "Recovery image: ASUS GX10 DGX OS 7.5.0-4\n\n"
+                        "Installation permanently removes this SSD's files, accounts, applications and settings. "
+                        "The app cannot undo it. Enabling this menu is followed by a final confirmation at the target console.",
+                        ["I checked the device and this exact SSD serial.", "I have backed up everything I need.",
+                         "I understand that existing data will be lost and recovery cannot be guaranteed."],
+                        phrase="ERASE " + value[1])
+                    if not approved:
+                        return
+                    phrase = "ERASE " + self.session.target_mac + " " + value[1]
+                authorize(self.root, self.session, value[0], value[1], phrase)
                 self.notice("Erase menu enabled. STOP remains default. Final confirmation is at the GX10 console.")
                 self.buttons()
             self.guarded(enable)
@@ -557,6 +891,8 @@ def main(argv=None):
             self.guarded(lambda: self.mark("first_boot_confirmed", "operator_first_boot_confirmation"))
             atomic_json(self.root / "desktop-completed.json", {"observed_at": time.time()})
             self.revoke_install()
+            if self.auto_flow:
+                (self.root / "desktop-stop").write_text("stop\n", encoding="utf-8")
             self.notice("First boot confirmed. Export the timing report, then stop services to restore host networking.")
             self.buttons()
 
@@ -604,8 +940,12 @@ def main(argv=None):
             started = exists("desktop-install-started.json")
             completed = exists("desktop-completed.json")
             for widget in (self.interface, self.server, self.client, self.mac, self.backup, self.create,
-                           self.refresh, self.resume):
+                           self.refresh, self.resume, self.detect, self.isolated):
                 widget.setEnabled(not busy and not active and not root)
+            self.connect_button.setEnabled(not busy and not active and not root and bool(self.peers))
+            self.peer_list.setEnabled(not busy and not root)
+            self.vendor.setEnabled(bool(root) and not busy and not active)
+            self.reboot_button.setEnabled(self.services and self.device is not None and not busy and not started)
             self.prepare_button.setEnabled(bool(root) and not busy and not active and not started)
             self.browse.setEnabled(not busy and not active)
             self.inspect_button.setEnabled(bool(root) and not busy and not active and not started)
@@ -625,6 +965,10 @@ def main(argv=None):
                 button.setEnabled(not busy and (i == 0 or bool(root)))
 
         def tick(self):
+            if (not args.smoke_test and not self.root and not self.job and QApplication.activeModalWidget() is None
+                    and time.monotonic() >= self.discovery_due):
+                self.periodic_discovery = True
+                self.auto_discover()
             if self.timing:
                 data = self.timing.data
                 events = {item["name"]: item["elapsed_seconds"] for item in data["events"]}
@@ -644,6 +988,23 @@ def main(argv=None):
                 self.results.setPlainText("\n".join(lines))
             if not self.root:
                 return
+            if self.auto_flow and (self.root / "diagnostic-agent-result.json").exists():
+                try:
+                    result = json.loads((self.root / "diagnostic-agent-result.json").read_text(encoding="utf-8"))
+                    manifest = json.loads((self.root / "image.json").read_text(encoding="utf-8"))
+                    proof = manifest.get("diagnostic_agent", {}).get("token_sha256")
+                    if (result.get("session") == self.session.fingerprint and proof and result.get("token_sha256") == proof
+                        and result.get("image") == manifest.get("iso_sha256") and all(result.get("checks", {}).get(key) is True
+                        for key in ("iso_read_only", "oem_present", "nvme_hidden", "mac_matched"))):
+                        if (self.root / "diagnostic.json").exists() and self.current_step == 2:
+                            for check in self.checks:
+                                check.setChecked(True)
+                            self.mark("diagnostic_verified", "temporary_ram_observer")
+                            self.show_step(3)
+                            self.notice("Temporary RAM observer verified ISO read-only, OEM content, hidden NVMe and MAC. "
+                                        "Review the exact SSD before authorizing installation.")
+                except (OSError, ValueError, KeyError):
+                    pass
             try:
                 status = json.loads((self.root / "desktop-service.json").read_text(encoding="utf-8"))
             except (OSError, ValueError):
@@ -657,6 +1018,9 @@ def main(argv=None):
                     self.notice(status.get("message", phase))
                     if phase == "ready":
                         self.mark("services_ready")
+                        if self.auto_flow and self.device and not self.reboot_offered:
+                            self.reboot_offered = True
+                            self.after_job(self.reboot_target)
                     if phase in ("ready", "stopped", "error"):
                         self.pending = False
                 if not recent and phase in ("starting", "ready"):
@@ -681,6 +1045,8 @@ def main(argv=None):
                 return
             if self.timing:
                 self.timing.finish("interrupted")
+            if self.device:
+                self.device.close()
             event.accept()
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
@@ -733,9 +1099,13 @@ def main(argv=None):
     app.setWindowIcon(QIcon(pixmap))
     window = Window()
     window.show()
+    if not args.smoke_test:
+        QTimer.singleShot(400, window.auto_discover)
     if args.smoke_test:
         import pycdlib
         import zstandard
+        import paramiko
+        assert paramiko.SSHClient
         assert isinstance(pycdlib.PyCdlib(), pycdlib.PyCdlib)
         payload = zstandard.ZstdCompressor().compress(b"bundle dependency check")
         assert zstandard.ZstdDecompressor().decompress(payload) == b"bundle dependency check"

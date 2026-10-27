@@ -55,7 +55,7 @@ class HTTPHandler(BaseHTTPRequestHandler):
         logging.info("HTTP %s %s", self.client_address[0], template % args)
 
 
-def serve(root: Path, session: Session, manage: bool, stop_ics: bool):
+def serve(root: Path, session: Session, manage: bool, stop_ics: bool, *, http_handler=None):
     require_admin()
     image = image_manifest(root, session, full=True)
     check_active_menu(root, session, image)
@@ -74,7 +74,7 @@ def serve(root: Path, session: Session, manage: bool, stop_ics: bool):
         resources.callback(dhcp.close)
         tftp = TFTPServer(root / "tftp", session.server, {session.client, session.server})
         resources.callback(tftp.close)
-        handler = partial(HTTPHandler, files={"/recovery.iso": Path(image["iso_path"])},
+        handler = partial(http_handler or HTTPHandler, files={"/recovery.iso": Path(image["iso_path"])},
                           allowed={session.client, session.server})
         http = ThreadingHTTPServer((session.server, session.http_port), handler)
         http.daemon_threads = True

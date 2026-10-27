@@ -1,7 +1,7 @@
 name: Desktop builds
 on:
   push:
-    tags: ['v0.2.*']
+    tags: ['v0.2.*', 'v0.3.*']
   pull_request:
     paths: ['src/**', 'packaging/**', 'desktop_entry.py', 'pyproject.toml', '.github/workflows/desktop.yml']
   workflow_dispatch:
@@ -28,6 +28,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -c packaging/requirements-build.txt -e ".[desktop,bundle,test]"
+      - name: Application version
+        shell: python
+        run: |
+          import os, tomllib
+          from pathlib import Path
+          value = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write('SPARK_APP_VERSION=' + value + '\n')
       - run: python -m pytest
         env:
           QT_QPA_PLATFORM: offscreen
@@ -48,7 +56,7 @@ jobs:
         run: |
           $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
           if (-not (Test-Path -LiteralPath $compiler)) { choco install innosetup --yes --no-progress }
-          & $compiler packaging/windows.iss
+          & $compiler "/DAppVersion=$env:SPARK_APP_VERSION" packaging/windows.iss
           if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
       - name: Test Windows install, launch and uninstall
         if: runner.os == 'Windows'
@@ -72,8 +80,8 @@ jobs:
           mkdir -p dist/installers dmg-content
           cp -R "dist/MKD Spark Recovery.app" dmg-content/
           ln -s /Applications dmg-content/Applications
-          hdiutil create -volname "MKD Spark Recovery" -srcfolder dmg-content -ov -format UDZO "dist/installers/MKD-Spark-Recovery-0.2.0-${{ matrix.label }}.dmg"
-          hdiutil verify "dist/installers/MKD-Spark-Recovery-0.2.0-${{ matrix.label }}.dmg"
+          hdiutil create -volname "MKD Spark Recovery" -srcfolder dmg-content -ov -format UDZO "dist/installers/MKD-Spark-Recovery-${SPARK_APP_VERSION}-${{ matrix.label }}.dmg"
+          hdiutil verify "dist/installers/MKD-Spark-Recovery-${SPARK_APP_VERSION}-${{ matrix.label }}.dmg"
       - name: Checksums
         shell: python
         run: |

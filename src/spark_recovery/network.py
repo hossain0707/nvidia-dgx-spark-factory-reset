@@ -15,14 +15,14 @@ from .config import RecoveryError, Session, atomic_json
 
 
 def command(args: list[str]) -> str:
-    result = subprocess.run(args, capture_output=True, text=True, timeout=90)
+    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
     if result.returncode:
         raise RecoveryError(f"Host command failed ({args[0]}): {result.stderr.strip() or result.stdout.strip()}")
     return result.stdout.strip()
 
 
 def powershell(source: str) -> str:
-    source = "$ErrorActionPreference='Stop'; " + source
+    source = "$ErrorActionPreference='Stop'; [Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); " + source
     encoded = base64.b64encode(source.encode("utf-16-le")).decode()
     return command(["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded])
 

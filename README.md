@@ -19,7 +19,9 @@ Terminal tooling for serving a verified **ASUS Ascent GX10** recovery image over
 
 ### Desktop app (Windows and Mac)
 
-The **v0.2.0 desktop preview** adds guided setup, real download progress, explicit erase safeguards and local timing reports. Download the Windows installer or Apple Silicon/Intel Mac disk image from [Releases](https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset/releases), then follow the [desktop guide](docs/DESKTOP.md). These builds are unsigned previews; signing/notarization and full desktop hardware qualification remain outstanding. The terminal workflow remains available below.
+The **v0.3.0 desktop preview** adds automatic wired-link/device discovery, authenticated auto-fill of MAC/model/SSD/network settings, cached image preparation, specific network/reboot/erase consents, and a temporary read-only diagnostic observer. Download the Windows installer or Apple Silicon/Intel Mac disk image from [Releases](https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset/releases), then follow [Automatic discovery and OEM recovery](docs/AUTOMATION.md). These builds are unsigned previews; full automatic-flow hardware qualification remains outstanding. Terminal commands remain available.
+
+**Different brands use different paths.** Dell GB10 is recognized and routed to Dell's own recovery instructions. Its Ethernet erase adapter is **not yet qualified**; ASUS media is never substituted. Authentication, firmware restrictions, final console erase confirmation and first-boot observation cannot be silently bypassed.
 
 Timing separates preparation, the recovery session and the operator-observed installation interval. First boot must be confirmed at the target console; download completion never counts as reset success.
 

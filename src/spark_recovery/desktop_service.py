@@ -102,7 +102,12 @@ def run_service(root: Path, operation="serve", *, stop_ics=False) -> int:
         with ServiceLock(root):
             if operation == "serve":
                 watcher.start()
-                serve(root, session, manage=True, stop_ics=stop_ics)
+                http_handler = None
+                if (root / "diagnostic-agent.json").exists():
+                    from functools import partial
+                    from .diagnostic_agent import DiagnosticHTTPHandler
+                    http_handler = partial(DiagnosticHTTPHandler, root=root, session=session)
+                serve(root, session, manage=True, stop_ics=stop_ics, http_handler=http_handler)
             elif operation == "restore":
                 HostNetwork(root, session).restore()
             else:

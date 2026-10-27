@@ -1,6 +1,6 @@
 # MKD Spark Recovery desktop
 
-The app adds a guided interface and local timing reports to the existing recovery engine. Terminal commands remain available. **ASUS Ascent GX10 only; no Founders Edition or other OEM profile.** A separate computer, isolated Ethernet cable, and GX10 monitor/keyboard are required.
+The app adds guided recovery, automatic discovery and local timing reports. Terminal commands remain available. **Automatic discovery recognizes multiple brands; Ethernet installation currently has an ASUS GX10 adapter only.** Other manufacturers get their own recovery guidance, never an ASUS image. Start with the [0.3 automatic workflow](AUTOMATION.md). A separate computer, isolated Ethernet cable and target monitor/keyboard remain required.
 
 ## Install
 
@@ -8,15 +8,17 @@ Use the official [MKD releases](https://github.com/mkd-hossain/nvidia-dgx-spark-
 
 | Computer | Download |
 |---|---|
-| Windows x64 | `MKD-Spark-Recovery-0.2.0-Windows-x64-Setup.exe` |
-| Apple Silicon Mac | `MKD-Spark-Recovery-0.2.0-macOS-arm64.dmg` |
-| Intel Mac | `MKD-Spark-Recovery-0.2.0-macOS-x64.dmg` |
+| Windows x64 | `MKD-Spark-Recovery-0.3.0-Windows-x64-Setup.exe` |
+| Apple Silicon Mac | `MKD-Spark-Recovery-0.3.0-macOS-arm64.dmg` |
+| Intel Mac | `MKD-Spark-Recovery-0.3.0-macOS-x64.dmg` |
 
-Compare the SHA-256 with `SHA256SUMS-*.txt`: Windows `Get-FileHash <installer> -Algorithm SHA256`; Mac `shasum -a 256 <download.dmg>`. Run the Windows installer, or drag the Mac app from the disk image to Applications. Launch the installed app. No Python installation is needed. SSH inspection requires the OS OpenSSH client and a previously trusted, working SSH key connection.
+Compare the SHA-256 with `SHA256SUMS-*.txt`: Windows `Get-FileHash <installer> -Algorithm SHA256`; Mac `shasum -a 256 <download.dmg>`. Run the Windows installer, or drag the Mac app from the disk image to Applications. Launch the installed app. No Python installation is needed. The automatic flow bundles an SSH client; only the legacy SSH textbox requires the OS OpenSSH client and an existing trusted key connection.
 
 These are **unsigned community preview builds**, without publisher signing or Apple notarization. Windows SmartScreen or macOS Gatekeeper may block them. Verify origin and hash before approving them through the OS's supported UI; do not globally disable security controls. Production distribution still needs MKD's signing identities and hardware qualification.
 
-## Guided workflow
+## Legacy manual/advanced workflow
+
+The following describes the optional manual path retained from 0.2. The default 0.3 flow detects/fills the network, authenticates and reads inventory, reuses media, offers specific network/reboot consents and reports diagnostic checks automatically. It can accept an ephemeral device password without saving it. See [Automation](AUTOMATION.md) for the current default.
 
 1. **Connect & identify:** back up the GX10, connect isolated Ethernet, refresh the adapter list and select the dedicated wired adapter. Enter an unused private /24 subnet and the target MAC from UEFI. The defaults are examples, not discovery results. Creating a session performs no reboot or erase.
 2. **Prepare & inspect:** accept vendor terms, download or select the official ISO, and wait for hash/driver checks. Download percentages count real bytes; hashing/extraction use an indeterminate indicator. Inspect using an existing trusted SSH-key connection, or import JSON saved from `target.py --json` on the GX10. The helper ships under `_internal/spark_recovery/target.py` on Windows and inside the Mac bundle's Resources/spark_recovery directory; source is also in this repository. See [target-local instructions](TARGET-AND-SSH.md). The app does not collect passwords or automatically trust host keys.

@@ -70,8 +70,11 @@ def authorize(root: Path, session: Session, disk: str, serial: str, confirmation
         raise RecoveryError("Record target inventory and diagnostic attestation first") from error
     if receipt.get("session") != session.fingerprint or receipt.get("image") != image["iso_sha256"]:
         raise RecoveryError("Diagnostic receipt belongs to a different target/image")
-    if not all(receipt.get(key) is True for key in
-               ("operator_attestation", "iso_read_only", "oem_present", "nvme_hidden")):
+    agent_proof = (receipt.get("agent_verified") is True and image.get("diagnostic_agent", {}).get("session") == session.fingerprint
+                   and receipt.get("agent_token_sha256") == image.get("diagnostic_agent", {}).get("token_sha256")
+                   and bool(receipt.get("agent_token_sha256")))
+    if not (receipt.get("operator_attestation") is True or agent_proof) or not all(receipt.get(key) is True for key in
+               ("iso_read_only", "oem_present", "nvme_hidden")):
         raise RecoveryError("Diagnostic checklist is incomplete")
     validate_inventory(inventory, session, disk, serial)
     expected = f"ERASE {session.target_mac} {serial}"
@@ -86,19 +89,24 @@ def authorize(root: Path, session: Session, disk: str, serial: str, confirmation
 def write_menu(root: Path, session: Session, disk: str = ""):
     destination = root / "tftp/grub/grub.cfg"
     temporary = destination.with_suffix(".cfg.pending")
-    temporary.write_text(render(session, disk), encoding="utf-8", newline="\n")
+    agent = False
+    if (root / "image.json").exists():
+        image = json.loads((root / "image.json").read_text(encoding="utf-8"))
+        agent = image.get("diagnostic_agent", {}).get("session") == session.fingerprint
+    temporary.write_text(render(session, disk, agent=agent), encoding="utf-8", newline="\n")
     temporary.replace(destination)
 
 
 def check_active_menu(root: Path, session: Session, image: dict):
     menu = (root / "tftp/grub/grub.cfg").read_text(encoding="utf-8")
-    if menu == render(session):
+    agent = image.get("diagnostic_agent", {}).get("session") == session.fingerprint
+    if menu == render(session, agent=agent):
         return
     try:
         consent = json.loads((root / "install.json").read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise RecoveryError("Unrecognized menu or missing install authorization; run revoke-install") from error
     if (consent.get("session") != session.fingerprint or consent.get("image") != image["iso_sha256"]
-            or menu != render(session, consent["disk"])):
+            or menu != render(session, consent["disk"], agent=agent)):
         raise RecoveryError("Menu or authorization changed; run revoke-install and inspect state")
 

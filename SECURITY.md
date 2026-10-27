@@ -9,9 +9,10 @@ This tool can expose an installer that permanently erases an SSD. Use it only on
 - Only the pinned ASUS GX10 image profile is implemented. Vendor artifacts are downloaded directly and hash-checked; none are redistributed here.
 - Use an isolated Ethernet link. TFTP and recovery HTTP are unauthenticated LAN protocols. MAC/IP allowlists are not cryptographic authentication and can be spoofed by a hostile participant.
 - Explicit permissions, matching inventory/serial, diagnostic receipts and a cancel-first menu reduce accidental activation. Local state is not tamper-proof against an administrator.
-- State contains hardware identifiers and local paths. Do not commit `state/`, inventories, logs, images, private keys, tokens or credentials. No telemetry is sent by this project.
-- No password or credential collection, `StrictHostKeyChecking=no`, automatic known-host deletion, global firewall disabling, partition commands on the host, or unattended default erase.
+- State contains hardware identifiers and local paths. Do not commit `state/`, inventories, logs, images, private keys, tokens or credentials. There is no external analytics upload; diagnostic observations stay on the isolated recovery link.
+- The automatic flow can accept a transient target SSH/sudo password; it is not persisted to disk or placed in shell arguments. Existing keys can be used instead. No `StrictHostKeyChecking=no`, silent known-host deletion, global firewall disabling, host partition commands or unattended default erase is added. Explicit verified key changes affect only the app-local trust store.
 - Existing SSH privilege is reused; the project does not grant blanket passwordless sudo. Target-local root BootNext/reboot is explicit.
+- The optional RAM observer has no command, erase, firmware-write or reboot endpoint. It is added to a derived diagnostic initrd only; installation uses the original initrd. Reports are bound to source IP, private session token and image. They do not prove successful installation or protect against a hostile isolated-link participant who steals the token. See [automation boundaries](docs/AUTOMATION.md).
 
 ## Reporting
 

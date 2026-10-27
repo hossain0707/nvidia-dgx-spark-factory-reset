@@ -4,6 +4,8 @@ The MKD application license applies to MKD's code only. It does not restrict rig
 
 Desktop builds use PySide6 Essentials / Shiboken6 and Qt Core, Gui and Widgets, distributed under their applicable LGPLv3 (or alternative upstream) terms. The application uses dynamically loaded, replaceable Qt libraries in an onedir bundle. You may replace or modify those components and reverse engineer this application as needed to debug your modifications to LGPL-covered libraries. The MKD license does not override those rights.
 
+Version 0.3 also includes Paramiko (LGPL-2.1) as replaceable Python source modules, with cryptography (Apache/BSD), bcrypt (Apache), PyNaCl (Apache), CFFI (MIT), pycparser (BSD) and Invoke (BSD). Their distribution metadata/license files are retained. The same library replacement and modification-debugging rights apply to LGPL-covered Paramiko; the MKD license does not restrict those rights. Corresponding Paramiko source is available at https://github.com/paramiko/paramiko (version 4.0.0). No third-party library source was modified by MKD.
+
 Corresponding Qt/PySide source and license texts are available at:
 
 - https://download.qt.io/official_releases/QtForPython/

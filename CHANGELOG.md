@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 discovery and OEM preview — 2026-10-27
+
+- Detect wired adapters, scoped IPv4/IPv6 neighbors and SSH endpoints; bound isolated-link searches and avoid Wi-Fi/default-gateway guesses.
+- Authenticate with explicit host-key trust and ephemeral password/key support; fill device MAC, model, SSD identity and collision-aware network plans from evidence.
+- Route ASUS, Dell GB10, Founders, HP ZGX, Lenovo PGX and MSI EdgeXpert identities through separate capability records; block unqualified or mismatched images.
+- Reuse verified images, serialize shared cache preparation, offer specific network/reboot/erase consents, and automatically clean up after confirmed first boot.
+- Add an optional read-only ASUS RAM diagnostic observer with session/image/token-bound results. Retain the original installer initrd and final console erase approval.
+- Fix UTF-8 command output on localized Windows and use the actual Windows InterfaceType property for Ethernet detection.
+- Keep Dell Ethernet installation blocked pending Dell media/adapter/hardware qualification; vendor guidance is not a reset-support claim.
+
 ## 0.2.0 desktop preview — 2026-10-26
 
 - Optional Windows/macOS desktop frontend; existing terminal recovery engine retained.
