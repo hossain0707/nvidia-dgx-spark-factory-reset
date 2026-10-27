@@ -21,7 +21,7 @@ from .images import prepare
 from .locking import ServiceLock
 from .network import command, powershell
 from .oem import detect_oem
-from .profiles import ASUS
+from .profiles import DELL_WW, DELL_US, image_profile
 from .safety import attest, authorize, image_manifest, validate_inventory, write_menu
 from .timing import RecoveryTiming, duration
 
@@ -93,7 +93,7 @@ def main(argv=None):
         from PySide6.QtCore import QStandardPaths, QThread, QTimer, Qt, Signal, QUrl
         from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontDatabase, QIcon, QPainter, QPixmap
         from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame,
-                                      QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit,
+                                      QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QInputDialog,
                                       QProgressBar, QPushButton, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
                                       QDialog, QDialogButtonBox, QGroupBox)
     except ImportError:
@@ -170,7 +170,7 @@ def main(argv=None):
             navigation.addWidget(self.clock_label)
             navigation.addWidget(QLabel("Elapsed since session creation\nIncludes preparation and waiting"))
             navigation.addSpacing(20)
-            navigation.addWidget(QLabel("OEM identity checks\nASUS PXE · Other OEMs guided\nPreview · No telemetry"))
+            navigation.addWidget(QLabel("OEM identity checks\nASUS / Dell PXE previews\nPreview · No telemetry"))
             row.addWidget(rail)
             content = QVBoxLayout()
             content.setContentsMargins(30, 26, 30, 24)
@@ -267,11 +267,11 @@ def main(argv=None):
             self.mac = QLineEdit()
             self.mac.setPlaceholderText("Target Ethernet MAC from firmware, e.g. 02:00:00:00:00:01")
             form.addRow("Host IPv4 /24", self.server)
-            form.addRow("GX10 recovery IPv4", self.client)
-            form.addRow("GX10 Ethernet MAC", self.mac)
+            form.addRow("target recovery IPv4", self.client)
+            form.addRow("target Ethernet MAC", self.mac)
             advanced_layout.addLayout(form)
             self.refresh = self.button("Refresh adapter list", self.refresh_interfaces, advanced_layout)
-            self.backup = QCheckBox("I have backed up the GX10 and am using an isolated Ethernet link.")
+            self.backup = QCheckBox("I have backed up the target and am using an isolated Ethernet link.")
             advanced_layout.addWidget(self.backup)
             self.create = self.button("Create manual recovery session →", self.create_session, advanced_layout)
             toggle = QPushButton("Show / hide advanced settings")
@@ -286,12 +286,12 @@ def main(argv=None):
             layout.addStretch()
 
         def media_page(self):
-            layout = self.page("02 / Prepare & inspect", "Download pinned official ASUS media (~10 GB) or choose an "
+            layout = self.page("02 / Prepare & inspect", "Download pinned official OEM media (~10 GB) or choose an "
                                "existing ISO. Preparation verifies hashes and creates a diagnostic-only boot menu.")
             self.iso = QLineEdit()
-            self.iso.setPlaceholderText("Leave empty to download directly from ASUS")
+            self.iso.setPlaceholderText("Leave empty to download the selected manufacturer's pinned image")
             layout.addWidget(self.iso)
-            self.browse = self.button("Choose existing ASUS ISO…", self.choose_iso, layout)
+            self.browse = self.button("Choose existing matching OEM ISO…", self.choose_iso, layout)
             self.vendor = QCheckBox("I accept the vendor download terms and have at least 24 GiB free disk space.")
             self.vendor.toggled.connect(lambda checked: self.after_job(self.prepare_media)
                 if checked and self.auto_flow and self.root and not (self.root / "image.json").exists() else None)
@@ -301,10 +301,10 @@ def main(argv=None):
             self.ssh = QLineEdit()
             self.ssh.setPlaceholderText("Existing SSH key connection: operator@current-target-address")
             layout.addWidget(self.ssh)
-            self.inspect_button = self.button("Inspect GX10 over trusted SSH", self.inspect_target, layout)
+            self.inspect_button = self.button("Inspect target over trusted SSH", self.inspect_target, layout)
             self.import_button = self.button("Import target inventory JSON…", self.import_target, layout)
-            self.inventory_label = QLabel("Inventory required: ASUS GX10 identity, target MAC, whole SSD and serial.\n"
-                                           "Without SSH, run target.py --json on the GX10 and import the saved file.")
+            self.inventory_label = QLabel("Inventory required: matching manufacturer/model, target MAC, whole SSD and serial.\n"
+                                           "Without SSH, run target.py --json on the target and import the saved file.")
             self.inventory_label.setWordWrap(True)
             layout.addWidget(self.inventory_label)
             layout.addStretch()
@@ -318,7 +318,7 @@ def main(argv=None):
             self.start = self.button("Start Ethernet recovery services", self.start_services, layout)
             self.reboot_button = self.button("Restart the verified target into diagnostic PXE…", self.reboot_target, layout)
             instructions = QPlainTextEdit("1. Wait for 'services ready' below.\n"
-                "2. On the GX10, reboot into its UEFI PXE IPv4 entry.\n"
+                "2. On the target, reboot into its UEFI PXE IPv4 entry.\n"
                 "3. Select VERIFY ONLY (STOP is the default).\n"
                 "4. At (initramfs), run one command at a time:\n\n"
                 "mount | grep /cdrom\nls /cdrom/oemdata\nls /dev/nvme*\n\n"
@@ -329,7 +329,7 @@ def main(argv=None):
             self.diagnostic_instructions = instructions
             layout.addWidget(instructions)
             self.checks = [QCheckBox(text) for text in ("ISO is mounted read-only at /cdrom.",
-                            "Both ASUS OEM files/directories are visible.", "No NVMe devices are exposed.")]
+                            "Both OEM files/directories are visible.", "No NVMe devices are exposed.")]
             for check in self.checks:
                 layout.addWidget(check)
             self.attest_button = self.button("Record diagnostic checks →", self.record_diagnostic, layout)
@@ -338,7 +338,7 @@ def main(argv=None):
 
         def install_page(self):
             layout = self.page("04 / Authorize the exact SSD", "This step enables the erase menu. Installation still "
-                               "requires a separate console selection on the GX10. All existing target SSD data will be lost.")
+                               "requires a separate console selection on the target. All existing target SSD data will be lost.")
             self.disk = QComboBox()
             layout.addWidget(self.disk)
             self.erase_label = QLabel("Record the diagnostic checks first.")
@@ -351,7 +351,7 @@ def main(argv=None):
             instructions = QLabel("After authorization: reboot from the diagnostic shell using reboot -f, then select "
                 "PXE IPv4 again. In GRUB select ERASE SSD → CONFIRM ERASE.\n\n"
                 "Click 'Installation started' immediately when you select that final console confirmation. "
-                "The app cannot inspect the GX10's disk-writing progress remotely.")
+                "The app cannot inspect the target's disk-writing progress remotely.")
             instructions.setWordWrap(True)
             layout.addWidget(instructions)
             self.install_started = self.button("I selected CONFIRM ERASE — start installation timer", self.mark_install, layout,
@@ -365,7 +365,7 @@ def main(argv=None):
             self.install_clock = QLabel("Installation interval: not started")
             self.install_clock.setObjectName("pageTitle")
             layout.addWidget(self.install_clock)
-            self.completed = self.button("GX10 has reached fresh first-run setup / desktop", self.complete, layout)
+            self.completed = self.button("target has reached fresh first-run setup / desktop", self.complete, layout)
             self.failed = self.button("Record an installation failure", self.failure, layout)
             self.stop = self.button("Stop services & restore host networking", self.stop_services, layout)
             self.restore = self.button("Restore networking after a stopped/crashed helper", self.restore_network, layout)
@@ -595,8 +595,26 @@ def main(argv=None):
                     if box.exec() == QMessageBox.StandardButton.Open:
                         QDesktopServices.openUrl(QUrl(profile.recovery_url))
                     return
+                selected_image = profile.image_profile
+                if profile.id == "dell-gb10":
+                    region, accepted = QInputDialog.getItem(self, "Dell recovery region",
+                        "Choose the recovery region matching this Dell FCM1253 device.\n"
+                        "Check Dell's support record if unsure; do not infer it from this PC's location.\n"
+                        "These images were inspected offline. A physical Dell Ethernet reset is not yet qualified.",
+                        ["Cancel — verify the device's region first", DELL_WW["region"], DELL_US["region"]], 0, False)
+                    if not accepted or region not in (DELL_WW["region"], DELL_US["region"]):
+                        device.close()
+                        return
+                    approved, _ = self.consent("Dell Ethernet preview",
+                        profile.explanation,
+                        ["I verified this device is Dell FCM1253 and selected its matching recovery region.",
+                         "I understand Dell documents USB recovery and this Ethernet preview lacks a physical Dell reset test."])
+                    if not approved:
+                        device.close()
+                        return
+                    selected_image = DELL_US["id"] if region == DELL_US["region"] else DELL_WW["id"]
                 mac = target_mac(inventory, device.peer)
-                session = network_plan(self.detected_adapter, device.peer, mac)
+                session = network_plan(self.detected_adapter, device.peer, mac, profile=selected_image)
                 inventory_disks(inventory, session)
                 root = self.data_dir / "sessions" / uuid.uuid4().hex
                 root.mkdir(parents=True, mode=0o700)
@@ -611,11 +629,12 @@ def main(argv=None):
                 self.timing.mark("session_created")
                 self.location.setText(str(root))
                 self.save_inventory(inventory)
+                self.iso.clear()
                 for manifest in sorted((self.data_dir / "sessions").glob("*/image.json"), key=lambda item: item.stat().st_mtime,
                                        reverse=True):
                     try:
                         image = json.loads(manifest.read_text(encoding="utf-8"))
-                        if image.get("iso_sha256") == ASUS["iso_sha256"] and Path(image["iso_path"]).is_file():
+                        if image.get("iso_sha256") == image_profile(session.profile)["iso_sha256"] and Path(image["iso_path"]).is_file():
                             self.iso.setText(image["iso_path"])
                             break
                     except (OSError, ValueError, KeyError):
@@ -709,7 +728,7 @@ def main(argv=None):
             self.guarded(load)
 
         def choose_iso(self):
-            path, _ = QFileDialog.getOpenFileName(self, "Official ASUS recovery ISO", "", "ISO images (*.iso)")
+            path, _ = QFileDialog.getOpenFileName(self, "Official matching OEM recovery ISO", "", "ISO images (*.iso)")
             if path:
                 self.iso.setText(path)
 
@@ -738,7 +757,7 @@ def main(argv=None):
                     self.diagnostic_instructions.setPlainText("The temporary RAM observer will report diagnostic checks "
                         "automatically.\n\nAfter the consented reboot, VERIFY ONLY starts after five seconds. "
                         "It blocks NVMe and cannot start installation.\n\nThe app waits for a session-bound report of: "
-                        "read-only ISO, ASUS OEM content, hidden NVMe and the matching MAC.\n\n"
+                        "read-only ISO, matching OEM content, hidden NVMe and the matching MAC.\n\n"
                         "No report or any failed check keeps installation blocked. Firmware/secure-boot failures "
                         "still need attention at the target console.")
                     for check in self.checks:
@@ -849,7 +868,7 @@ def main(argv=None):
                 if self.auto_flow:
                     approved, _ = self.consent("Permanent target SSD erasure",
                         f"Target Ethernet MAC: {self.session.target_mac}\nWhole SSD: {value[0]}\nSerial: {value[1]}\n"
-                        "Recovery image: ASUS GX10 DGX OS 7.5.0-4\n\n"
+                        f"Recovery image: {image_profile(self.session.profile)['title']}\n\n"
                         "Installation permanently removes this SSD's files, accounts, applications and settings. "
                         "The app cannot undo it. Enabling this menu is followed by a final confirmation at the target console.",
                         ["I checked the device and this exact SSD serial.", "I have backed up everything I need.",
@@ -859,19 +878,19 @@ def main(argv=None):
                         return
                     phrase = "ERASE " + self.session.target_mac + " " + value[1]
                 authorize(self.root, self.session, value[0], value[1], phrase)
-                self.notice("Erase menu enabled. STOP remains default. Final confirmation is at the GX10 console.")
+                self.notice("Erase menu enabled. STOP remains default. Final confirmation is at the target console.")
                 self.buttons()
             self.guarded(enable)
 
         def mark_install(self):
             answer = QMessageBox.question(self, "Start observed installation interval?", "Have you just selected "
-                "CONFIRM ERASE on the GX10? This records the observed start time; it does not issue another boot or erase.",
+                "CONFIRM ERASE on the target? This records the observed start time; it does not issue another boot or erase.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
             if answer == QMessageBox.StandardButton.Yes:
                 self.guarded(lambda: self.mark("install_started", "operator_console_confirmation"))
                 atomic_json(self.root / "desktop-install-started.json", {"observed_at": time.time()})
                 self.show_step(4)
-                self.notice("Installation interval running. Watch the GX10 console; keep power and Ethernet connected.")
+                self.notice("Installation interval running. Watch the target console; keep power and Ethernet connected.")
                 self.buttons()
 
         def revoke_install(self):
@@ -883,7 +902,7 @@ def main(argv=None):
             self.guarded(revoke)
 
         def complete(self):
-            answer = QMessageBox.question(self, "Confirm the GX10's first boot", "Does the GX10 show fresh first-run "
+            answer = QMessageBox.question(self, "Confirm the target's first boot", "Does the target show fresh first-run "
                 "setup or the new desktop, with no installation error? This is an operator-confirmed result.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:

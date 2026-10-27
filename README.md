@@ -9,7 +9,7 @@
 
 <p align="center"><strong>No USB storage drive. No default erase. No silent reboot.</strong></p>
 
-Terminal tooling for serving a verified **ASUS Ascent GX10** recovery image over a dedicated Ethernet cable. Prepare on Windows, macOS or Linux; inspect the GX10 locally or over SSH; prove the network boot before exposing an SSD-erasing installation menu.
+Terminal tooling and a desktop preview for serving pinned **ASUS Ascent GX10** or **Dell GB10 FCM1253** recovery media over a dedicated Ethernet cable. Prepare on Windows, macOS or Linux; inspect the target locally or over SSH; prove the network boot before exposing an SSD-erasing installation menu.
 
 **Community preview, not an official NVIDIA/ASUS utility.** The original Windows-to-GX10 workflow completed a real reinstall. This packaged implementation is a subsequent rewrite: automated tests do **not** constitute full hardware qualification on every host OS. No tool can guarantee interruption-free recovery. Review [compatibility](docs/COMPATIBILITY.md) before erasing data.
 
@@ -21,7 +21,7 @@ Terminal tooling for serving a verified **ASUS Ascent GX10** recovery image over
 
 The **v0.3.0 desktop preview** adds automatic wired-link/device discovery, authenticated auto-fill of MAC/model/SSD/network settings, cached image preparation, specific network/reboot/erase consents, and a temporary read-only diagnostic observer. Download the Windows installer or Apple Silicon/Intel Mac disk image from [Releases](https://github.com/mkd-hossain/nvidia-dgx-spark-factory-reset/releases), then follow [Automatic discovery and OEM recovery](docs/AUTOMATION.md). These builds are unsigned previews; full automatic-flow hardware qualification remains outstanding. Terminal commands remain available.
 
-**Different brands use different paths.** Dell GB10 is recognized and routed to Dell's own recovery instructions. Its Ethernet erase adapter is **not yet qualified**; ASUS media is never substituted. Authentication, firmware restrictions, final console erase confirmation and first-boot observation cannot be silently bypassed.
+**Different brands use different media.** Dell FCM1253 has separate checksum-pinned Worldwide and US OTA3 image profiles, inspected against the actual official downloads. The app requires an explicit regional choice and preview acknowledgement. **A physical Dell Ethernet reset has not been qualified.** ASUS media is never substituted. Authentication, firmware restrictions, final console erase confirmation and first-boot observation remain required. See [Dell evidence and limits](docs/DELL.md).
 
 Timing separates preparation, the recovery session and the operator-observed installation interval. First boot must be confirmed at the target console; download completion never counts as reset success.
 
@@ -42,7 +42,7 @@ Timing separates preparation, the recovery session and the operator-observed ins
 
 | Component | This release |
 |---|---|
-| Target profile | **ASUS Ascent GX10; ASUS DGX OS 7.5.0-4 ARM64 ISO** |
+| Target profiles | **ASUS GX10 7.5.0-4; Dell FCM1253 OTA3 WW / US** — separate OEM/region hashes |
 | Host software | Python 3.11+; Windows/macOS/Linux adapters and CI |
 | Transport | UEFI PXE IPv4 → ARM64 GRUB → TFTP boot files → HTTP ISO |
 | Target-local commands | Read-only inventory; explicit one-time PXE BootNext/reboot |

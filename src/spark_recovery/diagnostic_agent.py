@@ -1,4 +1,4 @@
-"""Optional read-only RAM diagnostic observer for the pinned ASUS image.
+"""Optional read-only RAM diagnostic observer for pinned OEM Casper images.
 
 No erase, shell command endpoint, credentials, firmware writes or reboot logic.
 The installation entry always uses the untouched original initrd.

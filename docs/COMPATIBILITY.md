@@ -10,7 +10,7 @@
 | SSH target control | Strict key checks, explicit app-local key rotation and authenticated inventory | Existing keys or ephemeral password; root/reboot needs separate consent/sudo authorization |
 | Automatic discovery | Windows/macOS/Linux parsers; bounded interface-scoped probes; IPv6 and collision-aware plans | Preview; SSH and reachable networking remain necessary |
 | Automatic ASUS diagnostics | Read-only temporary RAM observer; token/image/session bindings; generated against actual pinned initrd | Preview; new diagnostic hardware boot trial required |
-| Dell GB10 FCM1253 | Separate manufacturer/model detection and Dell official recovery guidance | Vendor-guided only; no qualified Ethernet erase adapter |
+| Dell GB10 FCM1253 | Official WW / US OTA3 downloads, checksums, initrd and disk-targeting scripts inspected; separate profiles | Media-inspected Ethernet preview; physical Dell reset unqualified |
 | NVIDIA DGX Spark Founders Edition | Separate identity and FastOS recovery path | Recognized; own image adapter not implemented |
 | HP ZGX / Lenovo PGX / MSI EdgeXpert | Model recognition and manufacturer support routing | No qualified image/erase adapter |
 
@@ -18,7 +18,7 @@ Passing the CI matrix means the software's **automated tests** passed on that ru
 
 ## Required equipment
 
-- A supported ASUS Ascent GX10 with its original Ethernet adapter, matching official image, and UEFI IPv4 PXE enabled.
+- A supported ASUS GX10 or preview Dell FCM1253 with its original Ethernet adapter, matching official OEM/region image, and UEFI IPv4 PXE enabled. Dell requires the additional preview acknowledgement; see [evidence](DELL.md).
 - A separate Windows/Mac/Linux host with dedicated Ethernet, power, administrator/root access and Python 3.11+.
 - Console monitor and working keyboard for the GX10. A USB keyboard or USB-C hub may be needed; USB **storage** is not required.
 - Enough RAM on the GX10 to hold the ISO/live installer. Host preparation recommends 16 GiB RAM and needs about 24 GiB free disk space for download/extraction.

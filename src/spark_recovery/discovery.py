@@ -263,12 +263,12 @@ def target_mac(inventory: dict, peer: Peer) -> str:
     return matches.pop()
 
 
-def network_plan(adapter: Adapter, peer: Peer, mac: str) -> Session:
+def network_plan(adapter: Adapter, peer: Peer, mac: str, *, profile: str = "asus-gx10-7.5.0-4") -> Session:
     for value in adapter.addresses:
         interface = ipaddress.ip_interface(value)
         if private_v4(interface.ip):
             if 16 <= interface.network.prefixlen <= 30 and ip(peer.address).version == 4 and ip(peer.address) in interface.network:
-                return Session(str(interface.ip), str(ip(peer.address)), mac, adapter.id, interface.network.prefixlen)
+                return Session(str(interface.ip), str(ip(peer.address)), mac, adapter.id, interface.network.prefixlen, profile=profile)
     if ip(peer.address).version == 6:
         occupied_hosts = {str(ip(value.split("/")[0])) for value in adapter.addresses}
         occupied_hosts.update(str(ip(item["address"])) for item in adapter.neighbors)
@@ -278,7 +278,7 @@ def network_plan(adapter: Adapter, peer: Peer, mac: str) -> Session:
             if private_v4(interface.ip) and 16 <= interface.network.prefixlen <= 30:
                 for address in islice(interface.network.hosts(), 1024):
                     if str(address) not in occupied_hosts:
-                        return Session(str(interface.ip), str(address), mac, adapter.id, interface.network.prefixlen)
+                        return Session(str(interface.ip), str(address), mac, adapter.id, interface.network.prefixlen, profile=profile)
     occupied = []
     for value in [*adapter.routes, *adapter.addresses]:
         try:
@@ -297,7 +297,7 @@ def network_plan(adapter: Adapter, peer: Peer, mac: str) -> Session:
             number = (start + offset) % count
             network = ipaddress.ip_network((int(pool.network_address) + number * 256, 24))
             if not any(network.overlaps(existing) for existing in occupied):
-                return Session(str(network[1]), str(network[2]), mac, adapter.id)
+                return Session(str(network[1]), str(network[2]), mac, adapter.id, profile=profile)
     raise RecoveryError("No collision-free private recovery subnet found")
 
 

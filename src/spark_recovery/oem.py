@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import re
 
 from .config import RecoveryError
-from .profiles import ASUS
+from .profiles import ASUS, DELL_WW
 
 
 @dataclass(frozen=True)
@@ -25,11 +25,12 @@ PROFILES = {
     "asus-gx10": OEMProfile("asus-gx10", "ASUS", "Ascent GX10", "casper-pxe", ASUS["id"], ASUS["support"],
         "https://www.asus.com/networking-iot-servers/desktop-ai-supercomputer/asus-ascent/asus-ascent-gx10/helpdesk_download/",
         "preview", "Pinned ASUS image and diagnostic-first PXE adapter. Hardware qualification remains required."),
-    "dell-gb10": OEMProfile("dell-gb10", "Dell", "Pro Max / Pro Precision with GB10 (FCM1253)", "vendor-guided", None,
+    "dell-gb10": OEMProfile("dell-gb10", "Dell", "Pro Max with GB10 (FCM1253)", "casper-pxe", DELL_WW["id"],
         "https://www.dell.com/support/kbdoc/en-us/000382042/how-to-reinstall-the-nvidia-dgx-operating-system-on-dell-pro-max-with-grace-blackwell-systems",
         "https://www.dell.com/support/product-details/en-us/product/dell-pro-max-fcm1253-micro/drivers",
-        "vendor-media-required", "Dell documents service-tag-specific ISO download and USB recovery. "
-        "Ethernet installation is not qualified here. ASUS or Founders media must not be substituted."),
+        "media-inspected-preview", "Dell's WW and US OTA3 images were downloaded, checksum-verified and inspected offline. "
+        "Dell documents USB recovery; this Ethernet adapter has not completed a physical Dell reset test. "
+        "Select the region matching your Dell device; never substitute ASUS or Founders media."),
     "nvidia-founders": OEMProfile("nvidia-founders", "NVIDIA", "DGX Spark Founders Edition", "fastos-pxe", None,
         "https://docs.nvidia.com/dgx/dgx-spark/system-recovery.html",
         "https://www.nvidia.com/en-us/drivers/dgx-spark-recovery-software/",
@@ -62,7 +63,7 @@ def detect_oem(inventory: dict) -> OEMProfile:
         raise RecoveryError("Conflicting manufacturer evidence; automatic recovery is blocked")
     if vendors == ["asus"] and "gx10" in text:
         return PROFILES["asus-gx10"]
-    if vendors == ["dell"] and ("gb10" in text or "fcm1253" in text):
+    if vendors == ["dell"] and "fcm1253" in text:
         return PROFILES["dell-gb10"]
     if vendors == ["hp"] and "zgx" in text:
         return PROFILES["hp-zgx"]

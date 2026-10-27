@@ -1,4 +1,4 @@
-"""Verify and extract the pinned ASUS image without mounting physical disks."""
+"""Verify pinned OEM images without mounting physical disks."""
 from __future__ import annotations
 
 import gzip
@@ -13,7 +13,7 @@ import zipfile
 
 from .config import RecoveryError, Session, atomic_json, digest
 from .menu import render
-from .profiles import ASUS
+from .profiles import ASUS, image_profile
 
 
 def download(url: str, destination: Path, expected: str, *, progress=None) -> Path:
@@ -136,8 +136,9 @@ def inspect_initrd(path: Path) -> dict:
     return guards
 
 
-def verify_bootloader(path: Path) -> None:
-    if digest(path) != ASUS["bootloader_sha256"]:
+def verify_bootloader(path: Path, profile: dict | None = None) -> None:
+    profile = profile or ASUS
+    if digest(path) != profile["bootloader_sha256"]:
         raise RecoveryError("Bootloader SHA256 changed; maintainer review required")
     data = path.read_bytes()
     if len(data) < 64 or data[:2] != b"MZ":
@@ -151,6 +152,9 @@ def verify_bootloader(path: Path) -> None:
 def prepare(root: Path, session: Session, iso: Path | None = None, package: Path | None = None,
             bootloader: Path | None = None, *, progress=None, cache_dir: Path | None = None) -> dict:
     import pycdlib
+    profile = image_profile(session.profile)
+    if package is not None and "package_sha256" not in profile:
+        raise RecoveryError("This OEM supplies a direct ISO; an ASUS package cannot be used")
     def stage(message):
         if progress:
             progress({"stage": message})
@@ -159,18 +163,23 @@ def prepare(root: Path, session: Session, iso: Path | None = None, package: Path
     if iso is None:
         assets = cache_dir or root / "assets"
         assets.mkdir(parents=True, exist_ok=True)
+        assets = assets / profile["id"]
+        assets.mkdir(parents=True, exist_ok=True)
         iso = assets / "recovery.iso"
-        if not iso.exists() or digest(iso) != ASUS["iso_sha256"]:
-            if package is None:
-                if shutil.disk_usage(assets).free < 24 * 1024**3:
-                    raise RecoveryError("Allow at least 24 GiB free to download and unpack the ASUS package")
-                package = download(ASUS["url"], assets / "asus-package.zip", ASUS["package_sha256"], progress=progress)
-            stage("Verifying package and extracting ASUS ISO")
-            extract_package(package, iso)
+        if not iso.exists() or digest(iso) != profile["iso_sha256"]:
+            if shutil.disk_usage(assets).free < 24 * 1024**3:
+                raise RecoveryError("Allow at least 24 GiB free for recovery preparation")
+            if "package_sha256" in profile:
+                if package is None:
+                    package = download(profile["url"], assets / "asus-package.zip", profile["package_sha256"], progress=progress)
+                stage("Verifying package and extracting ASUS ISO")
+                extract_package(package, iso)
+            else:
+                download(profile["url"], iso, profile["iso_sha256"], progress=progress)
     iso = iso.resolve()
     stage("Verifying full ISO SHA-256; this reads the entire image")
-    if iso.stat().st_size != ASUS["iso_bytes"] or digest(iso) != ASUS["iso_sha256"]:
-        raise RecoveryError("ISO is not the pinned ASUS GX10 image; refusing to prepare it")
+    if iso.stat().st_size != profile["iso_bytes"] or digest(iso) != profile["iso_sha256"]:
+        raise RecoveryError("ISO does not match the pinned OEM/model/region profile; refusing to prepare it")
     tftp = root / "tftp"
     (tftp / "casper").mkdir(parents=True, exist_ok=True)
     (tftp / "grub").mkdir(exist_ok=True)
@@ -181,17 +190,19 @@ def prepare(root: Path, session: Session, iso: Path | None = None, package: Path
             image.get_file_from_iso(str(tftp / "casper" / name), rr_path="/casper/" + name)
         image.get_record(rr_path="/oemdata/oem-iso-cfg.sh")
         image.get_record(rr_path="/oemdata/debs")
+        if profile.get("marker"):
+            image.get_record(rr_path=profile["marker"])
     finally:
         image.close()
     stage("Inspecting recovery kernel, drivers and diagnostic guards")
     guards = inspect_initrd(tftp / "casper" / "initrd")
     destination = tftp / "grubnetaa64.efi.signed"
     if bootloader:
-        verify_bootloader(bootloader)
+        verify_bootloader(bootloader, profile)
         shutil.copyfile(bootloader, destination)
     else:
-        download(ASUS["bootloader_url"], destination, ASUS["bootloader_sha256"], progress=progress)
-        verify_bootloader(destination)
+        download(profile["bootloader_url"], destination, profile["bootloader_sha256"], progress=progress)
+        verify_bootloader(destination, profile)
     (tftp / "grub" / "grub.cfg").write_text(render(session), encoding="utf-8")
     stage("Writing verified manifest and diagnostic-only boot menu")
     manifest = {"session": session.fingerprint, "profile": session.profile,

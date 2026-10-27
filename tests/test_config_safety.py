@@ -76,7 +76,7 @@ def test_changed_bootfile_refused(prepared, session):
 def test_wrong_oem_refused(prepared, session):
     inventory = json.loads((prepared / "target.json").read_text())
     inventory["board"] = ["NVIDIA Founders Edition"]
-    with pytest.raises(RecoveryError, match="ASUS"):
+    with pytest.raises(RecoveryError, match="Manufacturer|OEM"):
         validate_inventory(inventory, session, "/dev/nvme0n1", "TEST-SERIAL")
 
 

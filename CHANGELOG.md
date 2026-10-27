@@ -6,9 +6,10 @@
 - Authenticate with explicit host-key trust and ephemeral password/key support; fill device MAC, model, SSD identity and collision-aware network plans from evidence.
 - Route ASUS, Dell GB10, Founders, HP ZGX, Lenovo PGX and MSI EdgeXpert identities through separate capability records; block unqualified or mismatched images.
 - Reuse verified images, serialize shared cache preparation, offer specific network/reboot/erase consents, and automatically clean up after confirmed first boot.
-- Add an optional read-only ASUS RAM diagnostic observer with session/image/token-bound results. Retain the original installer initrd and final console erase approval.
+- Add an optional read-only OEM Casper RAM diagnostic observer with session/image/token-bound results. Retain the original installer initrd and final console erase approval.
 - Fix UTF-8 command output on localized Windows and use the actual Windows InterfaceType property for Ethernet detection.
-- Keep Dell Ethernet installation blocked pending Dell media/adapter/hardware qualification; vendor guidance is not a reset-support claim.
+- Add independent Dell FCM1253 OTA3 WW / US profiles after downloading and verifying both official ISOs, inspecting their Casper drivers/stops and forced-disk installer flow, and exercising preparation against both. Require an explicit regional selection and preview acknowledgement. Physical Dell Ethernet reset qualification remains outstanding.
+- Bundle SSH dependencies with third-party notices and statically link Intel Mac cryptography to avoid frozen OpenSSL conflicts.
 
 ## 0.2.0 desktop preview — 2026-10-26
 

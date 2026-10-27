@@ -18,6 +18,7 @@ from .locking import ServiceLock
 from .network import HostNetwork
 from .safety import attest, authorize, image_manifest, write_menu
 from .server import doctor, serve
+from .profiles import ASUS, IMAGES
 
 
 def ssh_command(destination: str, source: str, args: list[str] | None = None, *, sudo=False) -> list[str]:
@@ -41,7 +42,7 @@ def ssh_inventory(destination: str) -> dict:
 
 
 def parser():
-    app = argparse.ArgumentParser(description="Diagnostic-first Ethernet recovery. ASUS GX10 profile; no USB drive.")
+    app = argparse.ArgumentParser(description="Diagnostic-first OEM Ethernet recovery previews; no USB drive.")
     app.add_argument("--version", action="version", version=__version__)
     app.add_argument("--state", type=Path, default=Path("state"), help="Private local state directory; never commit it")
     commands = app.add_subparsers(dest="command", required=True)
@@ -50,6 +51,7 @@ def parser():
         init.add_argument("--" + flag, required=True)
     init.add_argument("--prefix", type=int, default=24)
     init.add_argument("--http-port", type=int, default=8080)
+    init.add_argument("--profile", choices=tuple(IMAGES), default=ASUS["id"], help="Exact OEM/model/region image; verified inventory must match")
     commands.add_parser("wizard", help="Interactive host setup; never erases or reboots")
     image = commands.add_parser("prepare", help="Verify official artifacts and create a diagnostic-only boot tree")
     image.add_argument("--iso", type=Path)
@@ -103,7 +105,7 @@ def run(args):
             mac = input("Target Ethernet MAC shown in GX10 firmware: ").strip()
             session = Session(server, client, mac, interface)
         else:
-            session = Session(args.server, args.client, args.mac, args.interface, args.prefix, args.http_port)
+            session = Session(args.server, args.client, args.mac, args.interface, args.prefix, args.http_port, profile=args.profile)
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         session.save(root)
         print(f"Session saved: {root}\nTarget: {session.target_mac}; plan {session.fingerprint[:16]}")

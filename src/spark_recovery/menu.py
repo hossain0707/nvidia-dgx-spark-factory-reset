@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from .config import RecoveryError, Session
+from .profiles import image_profile
 
 
 def kernel_args(session: Session, *, install: bool = False, disk: str = "") -> str:
@@ -45,9 +46,10 @@ menuentry 'VERIFY ONLY - SSD hidden; stop before installer' {
         if not disk:
             config = config.replace("set default=0\nset timeout=-1", "set default=1\nset timeout=5", 1)
     if disk:
+        vendor = image_profile(session.profile)["vendor"]
         args = kernel_args(session, install=True, disk=disk)
         config += f"""
-submenu 'ERASE SSD - ASUS DGX OS installation' {{
+submenu 'ERASE SSD - {vendor} DGX OS installation' {{
     set default=0
     set timeout=-1
     menuentry 'CANCEL - preserve existing data' {{
@@ -55,7 +57,7 @@ submenu 'ERASE SSD - ASUS DGX OS installation' {{
         sleep --interruptible 5
     }}
     menuentry 'CONFIRM ERASE {disk} - START INSTALLATION' {{
-        echo 'Erasing the explicitly approved SSD and reinstalling ASUS DGX OS.'
+        echo 'Erasing the explicitly approved SSD and reinstalling {vendor} DGX OS.'
         linux /casper/vmlinuz {args}
         initrd /casper/initrd
     }}

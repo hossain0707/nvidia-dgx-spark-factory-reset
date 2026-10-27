@@ -8,7 +8,7 @@ import re
 
 from .config import RecoveryError, Session, atomic_json, digest, mac_address
 from .menu import render
-from .profiles import ASUS
+from .profiles import image_profile
 
 
 def image_manifest(root: Path, session: Session, *, full: bool = False) -> dict:
@@ -16,8 +16,8 @@ def image_manifest(root: Path, session: Session, *, full: bool = False) -> dict:
         image = json.loads((root / "image.json").read_text(encoding="utf-8"))
         if image["session"] != session.fingerprint or image["profile"] != session.profile:
             raise RecoveryError("Image is bound to a different session; run prepare again")
-        if image["iso_sha256"] != ASUS["iso_sha256"]:
-            raise RecoveryError("Manifest does not identify the pinned ASUS image")
+        if image["iso_sha256"] != image_profile(session.profile)["iso_sha256"]:
+            raise RecoveryError("Manifest does not identify the pinned OEM/region image")
         if not image["guards"] or not all(image["guards"].values()):
             raise RecoveryError("Missing image diagnostic guards")
         for relative, expected in image["boot_files"].items():
@@ -50,9 +50,9 @@ def validate_inventory(inventory: dict, session: Session, disk: str, serial: str
     if not any(mac_address(value) == session.target_mac for value in inventory.get("interfaces", {}).values()
                if value != "00:00:00:00:00:00"):
         raise RecoveryError("Inventory MAC does not match the recovery target")
-    board = " ".join(value for value in inventory.get("board", []) if isinstance(value, str)).lower()
-    if "asus" not in board or "gx10" not in board:
-        raise RecoveryError("Inventory does not identify an ASUS GX10; OEM mismatch or missing board evidence")
+    from .oem import detect_oem
+    if detect_oem(inventory).id != image_profile(session.profile)["oem"]:
+        raise RecoveryError("Inventory OEM/model does not match the selected recovery image")
     if not re.fullmatch(r"/dev/nvme[0-9]+n[0-9]+", disk):
         raise RecoveryError("Use a whole NVMe namespace from the inspected target inventory")
     matches = [item for item in inventory.get("disks", [])

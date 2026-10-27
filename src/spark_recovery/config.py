@@ -72,8 +72,8 @@ class Session:
             raise RecoveryError("Use a dedicated Ethernet interface name (Windows: numeric interface index)")
         if not 1024 <= self.http_port <= 65535:
             raise RecoveryError("HTTP port must be between 1024 and 65535")
-        if self.profile != "asus-gx10-7.5.0-4":
-            raise RecoveryError("This release supports only the pinned ASUS GX10 image profile")
+        from .profiles import image_profile
+        image_profile(self.profile)
         object.__setattr__(self, "target_mac", mac_address(self.target_mac))
         if not self.session_id:
             object.__setattr__(self, "session_id", uuid.uuid4().hex)

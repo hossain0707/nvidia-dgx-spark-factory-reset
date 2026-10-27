@@ -84,7 +84,7 @@ def test_oem_specific_routing_and_no_cross_flash(board, expected):
     inventory = {"machine": "aarch64", "board": board}
     profile = detect_oem(inventory)
     assert profile.id == expected
-    if expected != "asus-gx10":
+    if expected not in ("asus-gx10", "dell-gb10"):
         assert profile.image_profile is None
         with pytest.raises(RecoveryError):
             ethernet_profile(inventory)

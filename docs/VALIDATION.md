@@ -28,3 +28,7 @@ The package's preparation path is additionally exercised locally against the act
 Before advertising a host/hardware combination as qualified, record host OS/version, architecture, Python, Ethernet adapter/driver, target OEM/model, image version, UEFI/Secure Boot settings, diagnostic results, SSD identity mapping, installer completion and successful first boot. Redact serials, MACs, IPs, keys, tokens and personal paths before sharing evidence. Include cleanup tests after normal termination, initialization error and abnormal process exit.
 
 The animated README and a green CI badge are presentation/automated-test evidence, not hardware qualification or a promise of error-free recovery.
+
+## Dell media inspection (2026-10-27)
+
+Both official Dell FCM1253 OTA3 WW and US ISO downloads matched Dell-published SHA-256 checksums. Full preparation, kernel/initrd extraction, Casper guards, original ARM64 bootloader validation and derived diagnostic observer generation were exercised against both images. Tests reject wrong OEM/model/region evidence. Offline installer inspection confirmed forced-disk handling. See [Dell evidence](DELL.md). No Dell hardware was rebooted or erased; physical network boot, installation and first boot remain unqualified.
