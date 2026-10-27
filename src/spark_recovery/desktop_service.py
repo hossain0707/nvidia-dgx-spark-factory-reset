@@ -73,7 +73,7 @@ class ServiceStatus(logging.Handler):
     def emit(self, record):
         message = record.getMessage()
         if message.startswith("Serving ONLY"):
-            self.set("ready", "Ethernet recovery services are ready; STOP is the boot-menu default")
+            self.set("ready", "Ethernet recovery services are ready; installation never starts without erase approval")
 
 
 def run_service(root: Path, operation="serve", *, stop_ics=False) -> int:

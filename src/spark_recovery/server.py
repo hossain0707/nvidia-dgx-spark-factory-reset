@@ -106,7 +106,8 @@ def serve(root: Path, session: Session, manage: bool, stop_ics: bool, *, http_ha
             thread.start()
         logging.info("Serving ONLY target %s at %s. Keep this terminal open. Ctrl+C stops and restores host networking.",
                      session.target_mac, session.client)
-        logging.info("HTTP %s:%s, TFTP 69, DHCP 67; STOP is the menu default.", session.server, session.http_port)
+        logging.info("HTTP %s:%s, TFTP 69, DHCP 67; %s", session.server, session.http_port,
+                     "only non-erasing diagnostics may auto-start" if image.get("diagnostic_agent") else "STOP is the menu default")
         try:
             while not stop.wait(0.5):
                 pass

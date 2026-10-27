@@ -107,7 +107,7 @@ flowchart LR
 
 - Only the target MAC receives DHCP, including the recovery kernel's follow-up request. Replies use `255.255.255.255` on the explicit Ethernet interface.
 - HTTP serves an explicit file allowlist. TFTP rejects uploads and traversal, supports retries, and handles block-number rollover.
-- **STOP** is always the default and waits indefinitely. Diagnostic mode blocks NVMe and stops before installer startup.
+- Manual mode defaults to **STOP**, indefinitely. Automatic mode may start **VERIFY ONLY** after a countdown; it blocks NVMe and stops before installer startup. Erasing installation always retains explicit approval and a cancel-first console menu.
 - Erase needs a diagnostic attestation, matching target/disk serial, an exact confirmation phrase and another console selection.
 - Managed network changes are journaled; Ctrl+C restores them. After a crash, use `restore`. OS locks prevent competing processes using the same state.
 - SSH never disables host-key checks or collects passwords. State contains hardware identifiers and must remain private.

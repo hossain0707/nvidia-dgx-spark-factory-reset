@@ -38,6 +38,8 @@ menuentry 'VERIFY ONLY - SSD hidden; stop before installer' {
 }
 """
     if agent:
+        config = config.replace("STOP is always the default; no timed erase.",
+                                "Only non-erasing VERIFY may auto-start; no timed erase.", 1)
         config = config.replace("initrd /casper/initrd", "initrd /casper/initrd-diagnostic", 1)
         config = config.replace("init=/bin/sh", "init=/bin/sh mkd.diagnostic=1", 1)
         if not disk:
