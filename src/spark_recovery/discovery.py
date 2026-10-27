@@ -287,12 +287,17 @@ def network_plan(adapter: Adapter, peer: Peer, mac: str) -> Session:
             continue
         if network.version == 4 and network.prefixlen:
             occupied.append(network)
-    start = secrets.randbelow(4096)
-    for offset in range(4096):
-        number = (start + offset) % 4096
-        network = ipaddress.ip_network(f"172.{16 + number // 256}.{number % 256}.0/24")
-        if not any(network.overlaps(existing) for existing in occupied):
-            return Session(str(network[1]), str(network[2]), mac, adapter.id)
+    for pool_text in ("172.16.0.0/12", "10.0.0.0/8", "192.168.0.0/16"):
+        pool = ipaddress.ip_network(pool_text)
+        if any(pool.subnet_of(existing) for existing in occupied):
+            continue
+        count = 1 << (24 - pool.prefixlen)
+        start = secrets.randbelow(count)
+        for offset in range(count):
+            number = (start + offset) % count
+            network = ipaddress.ip_network((int(pool.network_address) + number * 256, 24))
+            if not any(network.overlaps(existing) for existing in occupied):
+                return Session(str(network[1]), str(network[2]), mac, adapter.id)
     raise RecoveryError("No collision-free private recovery subnet found")
 
 

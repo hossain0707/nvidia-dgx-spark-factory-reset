@@ -55,6 +55,9 @@ def test_reuse_real_network_and_allocate_without_route_collision():
     reused = network_plan(reserved, ipv6_peer, peer.mac)
     assert reused.server == "192.168.42.10" and reused.client == "192.168.42.2"
     ipv6 = replace(adapter, addresses=["fe80::1%en7/64"], routes=["0.0.0.0/0", "172.16.0.0/12"])
+    fallback = network_plan(ipv6, replace(peer, address="fe80::2%en7"), peer.mac)
+    assert ipaddress.ip_address(fallback.server) in ipaddress.ip_network("10.0.0.0/8")
+    ipv6.routes += ["10.0.0.0/8", "192.168.0.0/16"]
     with pytest.raises(RecoveryError, match="collision"):
         network_plan(ipv6, replace(peer, address="fe80::2%en7"), peer.mac)
     ipv6.routes = ["172.16.0.0/16", "10.0.0.0/8", "192.168.0.0/16"]
